@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -68,7 +68,7 @@ const mockMessages: Message[] = [
   }
 ]
 
-export default function ChatConsultationPage() {
+function ChatConsultationPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -326,5 +326,20 @@ export default function ChatConsultationPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ChatConsultationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading chat consultation...</p>
+        </div>
+      </div>
+    }>
+      <ChatConsultationPageContent />
+    </Suspense>
   )
 } 
