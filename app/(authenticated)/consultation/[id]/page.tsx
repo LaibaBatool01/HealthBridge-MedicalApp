@@ -13,14 +13,15 @@ import {
 } from "lucide-react"
 
 interface ConsultationPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function ConsultationPage({ params }: ConsultationPageProps) {
   try {
-    const consultation = await getConsultationById(params.id)
+    const { id } = await params
+    const consultation = await getConsultationById(id)
     
     if (!consultation) {
       notFound()
@@ -61,7 +62,7 @@ export default async function ConsultationPage({ params }: ConsultationPageProps
           {/* Main Video Area */}
           <div className="lg:col-span-2">
             <VideoConsultation
-              consultationId={params.id}
+              consultationId={id}
               consultationData={{
                 ...consultation,
                 video_room_name: consultation.video_room_name || `healthcare-${consultation.id}`,
