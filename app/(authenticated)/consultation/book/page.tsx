@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -50,7 +50,7 @@ const availableSlots = [
   { date: "2025-01-30", times: ["10:00", "11:30", "15:00", "16:30"] }
 ]
 
-export default function ConsultationBookingPage() {
+function ConsultationBookingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -529,5 +529,20 @@ export default function ConsultationBookingPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ConsultationBookingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading consultation booking...</p>
+        </div>
+      </div>
+    }>
+      <ConsultationBookingPageContent />
+    </Suspense>
   )
 } 
