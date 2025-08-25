@@ -99,21 +99,18 @@ export async function getDoctorConsultations(): Promise<DoctorConsultationData[]
         patientJoined: consultations.patientJoined,
         createdAt: consultations.createdAt,
         updatedAt: consultations.updatedAt,
-        patient: {
-          id: patients.id,
-          userId: patients.userId,
-          dateOfBirth: patients.dateOfBirth,
-          gender: patients.gender,
-          bloodType: patients.bloodType,
-          user: {
-            id: users.id,
-            email: users.email,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            phone: users.phone,
-            profileImage: users.profileImage
-          }
-        }
+        // Patient info
+        patientId: patients.id,
+        patientUserId: patients.userId,
+        patientDateOfBirth: patients.dateOfBirth,
+        patientGender: patients.gender,
+        patientBloodType: patients.bloodType,
+        // User info
+        patientUserEmail: users.email,
+        patientFirstName: users.firstName,
+        patientLastName: users.lastName,
+        patientPhone: users.phone,
+        patientProfileImage: users.profileImage
       })
       .from(consultations)
       .innerJoin(patients, eq(consultations.patientId, patients.id))
@@ -121,7 +118,46 @@ export async function getDoctorConsultations(): Promise<DoctorConsultationData[]
       .where(eq(consultations.doctorId, doctorId))
       .orderBy(desc(consultations.scheduledAt))
 
-    return result as DoctorConsultationData[]
+    // Map flattened results back to nested structure
+    return result.map(item => ({
+      id: item.id,
+      patientId: item.patientId,
+      scheduledAt: item.scheduledAt,
+      duration: item.duration,
+      consultationType: item.consultationType,
+      status: item.status,
+      symptoms: item.symptoms,
+      diagnosis: item.diagnosis,
+      doctorNotes: item.doctorNotes,
+      patientNotes: item.patientNotes,
+      prescriptionGiven: item.prescriptionGiven,
+      followUpRequired: item.followUpRequired,
+      followUpDate: item.followUpDate,
+      consultationFee: item.consultationFee,
+      paymentStatus: item.paymentStatus,
+      meetingLink: item.meetingLink,
+      videoRoomName: item.videoRoomName,
+      meetingStatus: item.meetingStatus,
+      doctorJoined: item.doctorJoined,
+      patientJoined: item.patientJoined,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      patient: {
+        id: item.patientId,
+        userId: item.patientUserId,
+        dateOfBirth: item.patientDateOfBirth,
+        gender: item.patientGender,
+        bloodType: item.patientBloodType,
+        user: {
+          id: item.patientUserId,
+          email: item.patientUserEmail,
+          firstName: item.patientFirstName,
+          lastName: item.patientLastName,
+          phone: item.patientPhone,
+          profileImage: item.patientProfileImage
+        }
+      }
+    })) as DoctorConsultationData[]
   } catch (error) {
     console.error("Error fetching doctor consultations:", error)
     return []
@@ -161,21 +197,18 @@ export async function getTodaysConsultations(): Promise<DoctorConsultationData[]
         patientJoined: consultations.patientJoined,
         createdAt: consultations.createdAt,
         updatedAt: consultations.updatedAt,
-        patient: {
-          id: patients.id,
-          userId: patients.userId,
-          dateOfBirth: patients.dateOfBirth,
-          gender: patients.gender,
-          bloodType: patients.bloodType,
-          user: {
-            id: users.id,
-            email: users.email,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            phone: users.phone,
-            profileImage: users.profileImage
-          }
-        }
+        // Patient info
+        patientId: patients.id,
+        patientUserId: patients.userId,
+        patientDateOfBirth: patients.dateOfBirth,
+        patientGender: patients.gender,
+        patientBloodType: patients.bloodType,
+        // User info
+        patientUserEmail: users.email,
+        patientFirstName: users.firstName,
+        patientLastName: users.lastName,
+        patientPhone: users.phone,
+        patientProfileImage: users.profileImage
       })
       .from(consultations)
       .innerJoin(patients, eq(consultations.patientId, patients.id))
@@ -187,7 +220,46 @@ export async function getTodaysConsultations(): Promise<DoctorConsultationData[]
       ))
       .orderBy(consultations.scheduledAt)
 
-    return result as DoctorConsultationData[]
+    // Map flattened results back to nested structure
+    return result.map(item => ({
+      id: item.id,
+      patientId: item.patientId,
+      scheduledAt: item.scheduledAt,
+      duration: item.duration,
+      consultationType: item.consultationType,
+      status: item.status,
+      symptoms: item.symptoms,
+      diagnosis: item.diagnosis,
+      doctorNotes: item.doctorNotes,
+      patientNotes: item.patientNotes,
+      prescriptionGiven: item.prescriptionGiven,
+      followUpRequired: item.followUpRequired,
+      followUpDate: item.followUpDate,
+      consultationFee: item.consultationFee,
+      paymentStatus: item.paymentStatus,
+      meetingLink: item.meetingLink,
+      videoRoomName: item.videoRoomName,
+      meetingStatus: item.meetingStatus,
+      doctorJoined: item.doctorJoined,
+      patientJoined: item.patientJoined,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      patient: {
+        id: item.patientId,
+        userId: item.patientUserId,
+        dateOfBirth: item.patientDateOfBirth,
+        gender: item.patientGender,
+        bloodType: item.patientBloodType,
+        user: {
+          id: item.patientUserId,
+          email: item.patientUserEmail,
+          firstName: item.patientFirstName,
+          lastName: item.patientLastName,
+          phone: item.patientPhone,
+          profileImage: item.patientProfileImage
+        }
+      }
+    })) as DoctorConsultationData[]
   } catch (error) {
     console.error("Error fetching today's consultations:", error)
     return []
@@ -225,21 +297,18 @@ export async function getUpcomingConsultations(): Promise<DoctorConsultationData
         patientJoined: consultations.patientJoined,
         createdAt: consultations.createdAt,
         updatedAt: consultations.updatedAt,
-        patient: {
-          id: patients.id,
-          userId: patients.userId,
-          dateOfBirth: patients.dateOfBirth,
-          gender: patients.gender,
-          bloodType: patients.bloodType,
-          user: {
-            id: users.id,
-            email: users.email,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            phone: users.phone,
-            profileImage: users.profileImage
-          }
-        }
+        // Patient info
+        patientId: patients.id,
+        patientUserId: patients.userId,
+        patientDateOfBirth: patients.dateOfBirth,
+        patientGender: patients.gender,
+        patientBloodType: patients.bloodType,
+        // User info
+        patientUserEmail: users.email,
+        patientFirstName: users.firstName,
+        patientLastName: users.lastName,
+        patientPhone: users.phone,
+        patientProfileImage: users.profileImage
       })
       .from(consultations)
       .innerJoin(patients, eq(consultations.patientId, patients.id))
@@ -252,7 +321,46 @@ export async function getUpcomingConsultations(): Promise<DoctorConsultationData
       .orderBy(consultations.scheduledAt)
       .limit(10)
 
-    return result as DoctorConsultationData[]
+    // Map flattened results back to nested structure
+    return result.map(item => ({
+      id: item.id,
+      patientId: item.patientId,
+      scheduledAt: item.scheduledAt,
+      duration: item.duration,
+      consultationType: item.consultationType,
+      status: item.status,
+      symptoms: item.symptoms,
+      diagnosis: item.diagnosis,
+      doctorNotes: item.doctorNotes,
+      patientNotes: item.patientNotes,
+      prescriptionGiven: item.prescriptionGiven,
+      followUpRequired: item.followUpRequired,
+      followUpDate: item.followUpDate,
+      consultationFee: item.consultationFee,
+      paymentStatus: item.paymentStatus,
+      meetingLink: item.meetingLink,
+      videoRoomName: item.videoRoomName,
+      meetingStatus: item.meetingStatus,
+      doctorJoined: item.doctorJoined,
+      patientJoined: item.patientJoined,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      patient: {
+        id: item.patientId,
+        userId: item.patientUserId,
+        dateOfBirth: item.patientDateOfBirth,
+        gender: item.patientGender,
+        bloodType: item.patientBloodType,
+        user: {
+          id: item.patientUserId,
+          email: item.patientUserEmail,
+          firstName: item.patientFirstName,
+          lastName: item.patientLastName,
+          phone: item.patientPhone,
+          profileImage: item.patientProfileImage
+        }
+      }
+    })) as DoctorConsultationData[]
   } catch (error) {
     console.error("Error fetching upcoming consultations:", error)
     return []
@@ -288,21 +396,18 @@ export async function getPendingConsultations(): Promise<DoctorConsultationData[
         patientJoined: consultations.patientJoined,
         createdAt: consultations.createdAt,
         updatedAt: consultations.updatedAt,
-        patient: {
-          id: patients.id,
-          userId: patients.userId,
-          dateOfBirth: patients.dateOfBirth,
-          gender: patients.gender,
-          bloodType: patients.bloodType,
-          user: {
-            id: users.id,
-            email: users.email,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            phone: users.phone,
-            profileImage: users.profileImage
-          }
-        }
+        // Patient info
+        patientId: patients.id,
+        patientUserId: patients.userId,
+        patientDateOfBirth: patients.dateOfBirth,
+        patientGender: patients.gender,
+        patientBloodType: patients.bloodType,
+        // User info
+        patientUserEmail: users.email,
+        patientFirstName: users.firstName,
+        patientLastName: users.lastName,
+        patientPhone: users.phone,
+        patientProfileImage: users.profileImage
       })
       .from(consultations)
       .innerJoin(patients, eq(consultations.patientId, patients.id))
@@ -313,7 +418,46 @@ export async function getPendingConsultations(): Promise<DoctorConsultationData[
       ))
       .orderBy(consultations.scheduledAt)
 
-    return result as DoctorConsultationData[]
+    // Map flattened results back to nested structure
+    return result.map(item => ({
+      id: item.id,
+      patientId: item.patientId,
+      scheduledAt: item.scheduledAt,
+      duration: item.duration,
+      consultationType: item.consultationType,
+      status: item.status,
+      symptoms: item.symptoms,
+      diagnosis: item.diagnosis,
+      doctorNotes: item.doctorNotes,
+      patientNotes: item.patientNotes,
+      prescriptionGiven: item.prescriptionGiven,
+      followUpRequired: item.followUpRequired,
+      followUpDate: item.followUpDate,
+      consultationFee: item.consultationFee,
+      paymentStatus: item.paymentStatus,
+      meetingLink: item.meetingLink,
+      videoRoomName: item.videoRoomName,
+      meetingStatus: item.meetingStatus,
+      doctorJoined: item.doctorJoined,
+      patientJoined: item.patientJoined,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      patient: {
+        id: item.patientId,
+        userId: item.patientUserId,
+        dateOfBirth: item.patientDateOfBirth,
+        gender: item.patientGender,
+        bloodType: item.patientBloodType,
+        user: {
+          id: item.patientUserId,
+          email: item.patientUserEmail,
+          firstName: item.patientFirstName,
+          lastName: item.patientLastName,
+          phone: item.patientPhone,
+          profileImage: item.patientProfileImage
+        }
+      }
+    })) as DoctorConsultationData[]
   } catch (error) {
     console.error("Error fetching pending consultations:", error)
     return []
