@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -68,7 +68,7 @@ export default function FindDoctorsPage() {
 
   useEffect(() => {
     filterAndSortDoctors()
-  }, [doctors, searchQuery, selectedSpecialty, sortBy, sortOrder, availabilityFilter, filterAndSortDoctors])
+  }, [filterAndSortDoctors])
 
   const loadDoctors = async () => {
     try {
@@ -82,7 +82,7 @@ export default function FindDoctorsPage() {
     }
   }
 
-  const filterAndSortDoctors = () => {
+  const filterAndSortDoctors = useCallback(() => {
     let filtered = [...doctors]
 
     // Filter by search query
@@ -141,7 +141,7 @@ export default function FindDoctorsPage() {
     })
 
     setFilteredDoctors(filtered)
-  }
+  }, [doctors, searchQuery, selectedSpecialty, sortBy, sortOrder, availabilityFilter])
 
   const handleSpecialtyChange = async (specialty: string) => {
     setSelectedSpecialty(specialty)

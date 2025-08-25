@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -63,7 +63,7 @@ export default function ConsultationNotesPage() {
 
   useEffect(() => {
     filterNotes()
-  }, [notes, searchTerm, activeTab, filterNotes])
+  }, [filterNotes])
 
   const loadConsultationNotes = async () => {
     try {
@@ -85,7 +85,7 @@ export default function ConsultationNotesPage() {
     }
   }
 
-  const filterNotes = async () => {
+  const filterNotes = useCallback(async () => {
     try {
       let filtered: ConsultationNoteData[] = []
 
@@ -125,7 +125,7 @@ export default function ConsultationNotesPage() {
       console.error("Error filtering notes:", error)
       setFilteredNotes(notes) // Fallback to all notes
     }
-  }
+  }, [notes, searchTerm, activeTab])
 
   const handleEditNote = (note: ConsultationNoteData) => {
     setSelectedNote(note)
