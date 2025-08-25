@@ -27,7 +27,7 @@ import {
   Shield,
   Zap
 } from "lucide-react"
-import { getCurrentMedicalUser } from "@/actions/users"
+import { getCurrentUserAction } from "@/actions/get-current-user"
 
 interface Medication {
   id: string
@@ -107,8 +107,12 @@ export default function PrescriptionsWritePage() {
 
   const loadUser = async () => {
     try {
-      const currentUser = await getCurrentMedicalUser()
-      setUser(currentUser)
+      const result = await getCurrentUserAction()
+      if (result.success) {
+        setUser(result.user)
+      } else {
+        console.error('Error loading user:', result.error)
+      }
     } catch (error) {
       console.error('Error loading user:', error)
     }
