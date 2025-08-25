@@ -68,7 +68,7 @@ export default function FindDoctorsPage() {
 
   useEffect(() => {
     filterAndSortDoctors()
-  }, [doctors, searchQuery, selectedSpecialty, sortBy, sortOrder, availabilityFilter])
+  }, [doctors, searchQuery, selectedSpecialty, sortBy, sortOrder, availabilityFilter, filterAndSortDoctors])
 
   const loadDoctors = async () => {
     try {
