@@ -3,10 +3,10 @@ import { getMessagesForConsultation } from "@/actions/messages"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { consultationId: string } }
+  { params }: { params: Promise<{ consultationId: string }> }
 ) {
   try {
-    const consultationId = params.consultationId
+    const { consultationId } = await params
 
     if (!consultationId) {
       return NextResponse.json(

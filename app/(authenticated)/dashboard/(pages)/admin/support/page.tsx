@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,7 +41,7 @@ export default function AdminSupportPage() {
   const [reply, setReply] = useState("")
 
   // Mock data for demonstration
-  const mockTickets: SupportTicket[] = [
+  const mockTickets: SupportTicket[] = useMemo(() => [
     {
       id: "1",
       title: "Cannot access consultation room",
@@ -78,7 +78,7 @@ export default function AdminSupportPage() {
       createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
       updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
     }
-  ]
+  ], [])
 
   useEffect(() => {
     const loadSupport = async () => {
