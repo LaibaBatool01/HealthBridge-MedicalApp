@@ -1,227 +1,320 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { motion } from "framer-motion"
 import { 
   Search, 
   Star, 
-  MapPin, 
   Clock, 
-  Calendar, 
+  MapPin, 
+  Phone, 
+  Calendar,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Stethoscope,
   Heart,
   Brain,
-  Stethoscope,
-  Eye,
-  Zap,
-  Filter,
-  MessageCircle,
-  Video
+  Activity,
+  Thermometer,
+  Users,
+  ArrowRight,
+  CheckCircle,
+  Video,
+  MessageCircle
 } from "lucide-react"
-
-type Doctor = {
-  id: string
-  name: string
-  specialty: string
-  subSpecialty?: string
-  rating: number
-  reviewCount: number
-  yearsExperience: number
-  consultationFee: number
-  isAvailable: boolean
-  nextAvailable: string
-  languages: string[]
-  bio: string
-  avatar?: string
-  education: string[]
-  certifications: string[]
-}
-
-const mockDoctors: Doctor[] = [
-  {
-    id: "1",
-    name: "Dr. Sarah Johnson",
-    specialty: "Cardiology",
-    subSpecialty: "Interventional Cardiology",
-    rating: 4.9,
-    reviewCount: 127,
-    yearsExperience: 12,
-    consultationFee: 75,
-    isAvailable: true,
-    nextAvailable: "Today 2:30 PM",
-    languages: ["English", "Spanish"],
-    bio: "Specialized in heart disease prevention and minimally invasive cardiac procedures.",
-    avatar: "/api/placeholder/100/100",
-    education: ["Harvard Medical School", "Johns Hopkins Residency"],
-    certifications: ["Board Certified Cardiologist", "FACC"]
-  },
-  {
-    id: "2", 
-    name: "Dr. Michael Chen",
-    specialty: "Neurology",
-    subSpecialty: "Headache Medicine",
-    rating: 4.8,
-    reviewCount: 89,
-    yearsExperience: 8,
-    consultationFee: 80,
-    isAvailable: true,
-    nextAvailable: "Tomorrow 10:00 AM",
-    languages: ["English", "Mandarin"],
-    bio: "Expert in treating chronic headaches, migraines, and neurological disorders.",
-    education: ["Stanford Medical School", "UCSF Neurology Residency"],
-    certifications: ["Board Certified Neurologist"]
-  },
-  {
-    id: "3",
-    name: "Dr. Emily Rodriguez",
-    specialty: "General Practice", 
-    rating: 4.7,
-    reviewCount: 203,
-    yearsExperience: 15,
-    consultationFee: 50,
-    isAvailable: false,
-    nextAvailable: "Monday 9:00 AM",
-    languages: ["English", "Spanish", "Portuguese"],
-    bio: "Comprehensive primary care with focus on preventive medicine and family health.",
-    education: ["UCLA Medical School", "Kaiser Permanente Residency"],
-    certifications: ["Board Certified Family Medicine"]
-  },
-  {
-    id: "4",
-    name: "Dr. James Wilson",
-    specialty: "Dermatology",
-    subSpecialty: "Cosmetic Dermatology",
-    rating: 4.9,
-    reviewCount: 156,
-    yearsExperience: 10,
-    consultationFee: 85,
-    isAvailable: true,
-    nextAvailable: "Today 4:00 PM",
-    languages: ["English"],
-    bio: "Specialized in skin conditions, acne treatment, and cosmetic procedures.",
-    education: ["Mayo Clinic Medical School", "Cleveland Clinic Residency"],
-    certifications: ["Board Certified Dermatologist", "FAAD"]
-  }
-]
+import { getAllDoctors, getDoctorsBySpecialty, searchDoctors, type DoctorWithUser } from "@/actions/doctors"
 
 const specialties = [
-  { id: "all", name: "All Specialties", icon: Stethoscope },
-  { id: "general_practice", name: "General Practice", icon: Heart },
-  { id: "cardiology", name: "Cardiology", icon: Heart },
-  { id: "dermatology", name: "Dermatology", icon: Eye },
-  { id: "neurology", name: "Neurology", icon: Brain },
-  { id: "pediatrics", name: "Pediatrics", icon: Heart },
-  { id: "psychiatry", name: "Psychiatry", icon: Brain },
-  { id: "orthopedics", name: "Orthopedics", icon: Zap }
+  { value: 'general_practice', label: 'General Practice', icon: Stethoscope },
+  { value: 'cardiology', label: 'Cardiology', icon: Heart },
+  { value: 'dermatology', label: 'Dermatology', icon: Thermometer },
+  { value: 'endocrinology', label: 'Endocrinology', icon: Activity },
+  { value: 'gastroenterology', label: 'Gastroenterology', icon: Stethoscope },
+  { value: 'neurology', label: 'Neurology', icon: Brain },
+  { value: 'oncology', label: 'Oncology', icon: Activity },
+  { value: 'pediatrics', label: 'Pediatrics', icon: Users },
+  { value: 'psychiatry', label: 'Psychiatry', icon: Brain },
+  { value: 'orthopedics', label: 'Orthopedics', icon: Activity },
+  { value: 'ophthalmology', label: 'Ophthalmology', icon: Activity },
+  { value: 'gynecology', label: 'Gynecology', icon: Users },
+  { value: 'urology', label: 'Urology', icon: Stethoscope },
+  { value: 'radiology', label: 'Radiology', icon: Activity },
+  { value: 'emergency_medicine', label: 'Emergency Medicine', icon: Activity },
+  { value: 'other', label: 'Other', icon: Stethoscope }
 ]
 
+type SortOption = 'rating' | 'experience' | 'fee' | 'name'
+type SortOrder = 'asc' | 'desc'
+
 export default function FindDoctorsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedSpecialty, setSelectedSpecialty] = useState("all")
-  const [sortBy, setSortBy] = useState("rating")
-  const [availableOnly, setAvailableOnly] = useState(false)
-  const [doctors, setDoctors] = useState(mockDoctors)
+  const [doctors, setDoctors] = useState<DoctorWithUser[]>([])
+  const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedSpecialty, setSelectedSpecialty] = useState('all')
+  const [sortBy, setSortBy] = useState<SortOption>('rating')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available'>('all')
 
-  const filteredDoctors = doctors.filter(doctor => {
-    const matchesSearch = doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesSpecialty = selectedSpecialty === "all" || 
-                            doctor.specialty.toLowerCase().replace(" ", "_") === selectedSpecialty
-    const matchesAvailability = !availableOnly || doctor.isAvailable
-    
-    return matchesSearch && matchesSpecialty && matchesAvailability
-  })
+  useEffect(() => {
+    loadDoctors()
+  }, [])
 
-  const sortedDoctors = [...filteredDoctors].sort((a, b) => {
-    switch (sortBy) {
-      case "rating":
-        return b.rating - a.rating
-      case "experience":
-        return b.yearsExperience - a.yearsExperience
-      case "price_low":
-        return a.consultationFee - b.consultationFee
-      case "price_high":
-        return b.consultationFee - a.consultationFee
-      default:
-        return 0
+  useEffect(() => {
+    filterAndSortDoctors()
+  }, [doctors, searchQuery, selectedSpecialty, sortBy, sortOrder, availabilityFilter])
+
+  const loadDoctors = async () => {
+    try {
+      setLoading(true)
+      const allDoctors = await getAllDoctors()
+      setDoctors(allDoctors)
+    } catch (error) {
+      console.error('Error loading doctors:', error)
+    } finally {
+      setLoading(false)
     }
-  })
+  }
+
+  const filterAndSortDoctors = () => {
+    let filtered = [...doctors]
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(doctor => 
+        doctor.user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doctor.user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (doctor.subSpecialty && doctor.subSpecialty.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (doctor.bio && doctor.bio.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    }
+
+    // Filter by specialty
+    if (selectedSpecialty && selectedSpecialty !== 'all') {
+      filtered = filtered.filter(doctor => doctor.specialty === selectedSpecialty)
+    }
+
+    // Filter by availability
+    if (availabilityFilter === 'available') {
+      filtered = filtered.filter(doctor => doctor.isAvailable)
+    }
+
+    // Sort doctors
+    filtered.sort((a, b) => {
+      let aValue: any
+      let bValue: any
+
+      switch (sortBy) {
+        case 'rating':
+          aValue = parseFloat(a.rating || '0')
+          bValue = parseFloat(b.rating || '0')
+          break
+        case 'experience':
+          aValue = a.yearsOfExperience || 0
+          bValue = b.yearsOfExperience || 0
+          break
+        case 'fee':
+          aValue = parseFloat(a.consultationFee || '0')
+          bValue = parseFloat(b.consultationFee || '0')
+          break
+        case 'name':
+          aValue = `${a.user.firstName} ${a.user.lastName}`
+          bValue = `${b.user.firstName} ${b.user.lastName}`
+          break
+        default:
+          aValue = 0
+          bValue = 0
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+    setFilteredDoctors(filtered)
+  }
+
+  const handleSpecialtyChange = async (specialty: string) => {
+    setSelectedSpecialty(specialty)
+    if (specialty && specialty !== 'all') {
+      try {
+        setLoading(true)
+        const specialtyDoctors = await getDoctorsBySpecialty(specialty)
+        setDoctors(specialtyDoctors)
+      } catch (error) {
+        console.error('Error loading doctors by specialty:', error)
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      loadDoctors()
+    }
+  }
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query)
+    if (query.length >= 3) {
+      try {
+        setLoading(true)
+        const searchResults = await searchDoctors(query)
+        setDoctors(searchResults)
+      } catch (error) {
+        console.error('Error searching doctors:', error)
+      } finally {
+        setLoading(false)
+      }
+    } else if (query.length === 0) {
+      loadDoctors()
+    }
+  }
 
   const getSpecialtyIcon = (specialty: string) => {
-    const specialtyData = specialties.find(s => 
-      s.name.toLowerCase() === specialty.toLowerCase()
-    )
+    const specialtyData = specialties.find(s => s.value === specialty)
     return specialtyData?.icon || Stethoscope
   }
 
+  const getSpecialtyLabel = (specialty: string) => {
+    const specialtyData = specialties.find(s => s.value === specialty)
+    return specialtyData?.label || specialty.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }
+
+  const formatConsultationFee = (fee: string | null) => {
+    if (!fee) return 'Contact for pricing'
+    return `$${parseFloat(fee).toFixed(0)}`
+  }
+
+  const getNextAvailableTime = () => {
+    const now = new Date()
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(10, 0, 0, 0)
+    return tomorrow.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'short', 
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Find Doctors</h1>
-        <p className="text-muted-foreground mt-2">
-          Search and connect with qualified healthcare professionals.
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Find Doctors</h1>
+        <p className="text-muted-foreground">
+          Browse verified doctors and book consultations
         </p>
       </div>
 
       {/* Search and Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search doctors by name or specialty..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Search & Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Search */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Search</label>
+              <Input
+                placeholder="Search by name, specialty..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+              />
             </div>
-            
-            <div className="flex gap-3">
-              <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Specialty" />
+
+            {/* Specialty Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Specialty</label>
+              <Select value={selectedSpecialty} onValueChange={handleSpecialtyChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All specialties" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All specialties</SelectItem>
                   {specialties.map((specialty) => (
-                    <SelectItem key={specialty.id} value={specialty.id}>
-                      {specialty.name}
+                    <SelectItem key={specialty.value} value={specialty.value}>
+                      <div className="flex items-center gap-2">
+                        <specialty.icon className="h-4 w-4" />
+                        {specialty.label}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
 
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Sort by" />
+            {/* Sort By */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Sort By</label>
+              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                <SelectTrigger>
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="rating">Rating</SelectItem>
                   <SelectItem value="experience">Experience</SelectItem>
-                  <SelectItem value="price_low">Price: Low to High</SelectItem>
-                  <SelectItem value="price_high">Price: High to Low</SelectItem>
+                  <SelectItem value="fee">Consultation Fee</SelectItem>
+                  <SelectItem value="name">Name</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
+            {/* Sort Order */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Order</label>
+              <div className="flex gap-2">
+                <Button
+                  variant={sortOrder === 'desc' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSortOrder('desc')}
+                  className="flex-1"
+                >
+                  <SortDesc className="h-4 w-4 mr-1" />
+                  Desc
+                </Button>
+                <Button
+                  variant={sortOrder === 'asc' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSortOrder('asc')}
+                  className="flex-1"
+                >
+                  <SortAsc className="h-4 w-4 mr-1" />
+                  Asc
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Availability Filter */}
+          <div className="mt-4">
+            <label className="text-sm font-medium mb-2 block">Availability</label>
+            <div className="flex gap-2">
               <Button
-                variant={availableOnly ? "default" : "outline"}
-                onClick={() => setAvailableOnly(!availableOnly)}
-                className="gap-2"
+                variant={availabilityFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setAvailabilityFilter('all')}
               >
-                <Filter className="h-4 w-4" />
-                Available Only
+                All Doctors
+              </Button>
+              <Button
+                variant={availabilityFilter === 'available' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setAvailabilityFilter('available')}
+              >
+                Available Now
               </Button>
             </div>
           </div>
@@ -229,112 +322,170 @@ export default function FindDoctorsPage() {
       </Card>
 
       {/* Results */}
-      <div className="grid gap-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Found {sortedDoctors.length} doctors
-            {selectedSpecialty !== "all" && ` in ${specialties.find(s => s.id === selectedSpecialty)?.name}`}
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-semibold">
+          {loading ? 'Loading...' : `${filteredDoctors.length} doctors found`}
+        </h2>
+        {!loading && filteredDoctors.length > 0 && (
+          <p className="text-muted-foreground">
+            Showing {filteredDoctors.length} of {doctors.length} doctors
           </p>
-        </div>
-
-        {sortedDoctors.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No doctors found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search criteria or removing filters.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {sortedDoctors.map((doctor) => {
-              const SpecialtyIcon = getSpecialtyIcon(doctor.specialty)
-              
-              return (
-                <Card key={doctor.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex gap-6">
-                      {/* Doctor Avatar */}
-                      <Avatar className="h-20 w-20">
-                        <AvatarImage src={doctor.avatar} />
-                        <AvatarFallback className="text-lg">
-                          {doctor.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      {/* Doctor Info */}
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="text-xl font-semibold">{doctor.name}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <SpecialtyIcon className="h-4 w-4 text-blue-600" />
-                              <span className="text-blue-600 font-medium">{doctor.specialty}</span>
-                              {doctor.subSpecialty && (
-                                <span className="text-muted-foreground">• {doctor.subSpecialty}</span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="text-right">
-                            <div className="text-2xl font-bold">${doctor.consultationFee}</div>
-                            <div className="text-sm text-muted-foreground">per consultation</div>
-                          </div>
-                        </div>
-
-                        {/* Rating and Experience */}
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span className="font-medium">{doctor.rating}</span>
-                            <span className="text-muted-foreground">({doctor.reviewCount} reviews)</span>
-                          </div>
-                          <div className="text-muted-foreground">
-                            {doctor.yearsExperience} years experience
-                          </div>
-                          <div className="flex gap-1">
-                            {doctor.languages.map((lang) => (
-                              <Badge key={lang} variant="secondary" className="text-xs">
-                                {lang}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Bio */}
-                        <p className="text-muted-foreground text-sm">{doctor.bio}</p>
-
-                        {/* Availability and Actions */}
-                        <div className="flex items-center justify-between pt-2">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className={`text-sm font-medium ${doctor.isAvailable ? 'text-green-600' : 'text-muted-foreground'}`}>
-                              {doctor.isAvailable ? 'Available' : 'Next available'}: {doctor.nextAvailable}
-                            </span>
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="gap-2">
-                              <MessageCircle className="h-4 w-4" />
-                              Message
-                            </Button>
-                            <Button size="sm" className="gap-2">
-                              <Video className="h-4 w-4" />
-                              Book Consultation
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
         )}
       </div>
+
+      {/* Doctors Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredDoctors.length === 0 ? (
+        <Card className="text-center py-12">
+          <CardContent>
+            <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">No doctors found</h3>
+            <p className="text-muted-foreground mb-4">
+              Try adjusting your search criteria or filters
+            </p>
+            <Button onClick={() => {
+              setSearchQuery('')
+              setSelectedSpecialty('')
+              loadDoctors()
+            }}>
+              Clear Filters
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDoctors.map((doctor, index) => (
+            <motion.div
+              key={doctor.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+            >
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">
+                        Dr. {doctor.user.firstName} {doctor.user.lastName}
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-2 mt-1">
+                        {(() => {
+                          const IconComponent = getSpecialtyIcon(doctor.specialty)
+                          return <IconComponent className="h-4 w-4" />
+                        })()}
+                        {getSpecialtyLabel(doctor.specialty)}
+                        {doctor.subSpecialty && (
+                          <span className="text-xs text-muted-foreground">
+                            • {doctor.subSpecialty}
+                          </span>
+                        )}
+                      </CardDescription>
+                    </div>
+                    <Badge variant={doctor.isAvailable ? 'default' : 'secondary'}>
+                      {doctor.isAvailable ? 'Available' : 'Unavailable'}
+                    </Badge>
+                  </div>
+
+                  {/* Rating */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${
+                            i < Math.floor(parseFloat(doctor.rating || '0'))
+                              ? 'text-yellow-400 fill-current'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm font-medium">
+                      {parseFloat(doctor.rating || '0').toFixed(1)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      ({doctor.totalRatings || 0} reviews)
+                    </span>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  {/* Experience and Fee */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {doctor.yearsOfExperience || 0}+ years
+                    </span>
+                    <span className="font-medium">
+                      {formatConsultationFee(doctor.consultationFee ?? null)}
+                    </span>
+                  </div>
+
+                  {/* Bio */}
+                  {doctor.bio && (
+                    <p className="text-sm text-muted-foreground line-clamp-3">
+                      {doctor.bio}
+                    </p>
+                  )}
+
+                  {/* Languages */}
+                  {doctor.languages && (
+                    <div className="flex flex-wrap gap-1">
+                      {(() => {
+                        try {
+                          const languages = JSON.parse(doctor.languages ?? '[]')
+                          return languages.map((lang: string, i: number) => (
+                            <Badge key={i} variant="outline" className="text-xs">
+                              {lang}
+                            </Badge>
+                          ))
+                        } catch {
+                          return null
+                        }
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Next Available */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span>Next available: {getNextAvailableTime()}</span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Button className="flex-1" size="sm">
+                      <Video className="h-4 w-4 mr-1" />
+                      Book Video
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      Chat
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   )
 } 

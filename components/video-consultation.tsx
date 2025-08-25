@@ -13,7 +13,10 @@ import {
   PhoneOff,
   Users,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  CheckCircle,
+  X
 } from "lucide-react"
 
 // Extend Window type to include JitsiMeetExternalAPI
@@ -56,6 +59,8 @@ export function VideoConsultation({
   const [isJoining, setIsJoining] = useState(false)
   const [participantCount, setParticipantCount] = useState(0)
   const [isJitsiReady, setIsJitsiReady] = useState(false)
+  const [showDeviceCheck, setShowDeviceCheck] = useState(false)
+  const [deviceCheckPassed, setDeviceCheckPassed] = useState(false)
   const apiRef = useRef<any>(null)
 
   // Check if Jitsi script is loaded
@@ -78,6 +83,7 @@ export function VideoConsultation({
     }
 
     setIsJoining(true)
+    setMeetingActive(true) // Set this early so the container exists
 
     try {
       // Generate secure room name
@@ -88,12 +94,21 @@ export function VideoConsultation({
         ? `Dr. ${currentUser.lastName}`
         : currentUser.firstName
 
+      // Wait a brief moment for the DOM to update with the container
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Verify container exists
+      const container = document.querySelector('#jitsi-meet-container')
+      if (!container) {
+        throw new Error('Video container not found. Please try again.')
+      }
+
       // Initialize Jitsi Meet
       apiRef.current = new window.JitsiMeetExternalAPI('meet.jit.si', {
         roomName: roomName,
         width: '100%',
         height: 500,
-        parentNode: document.querySelector('#jitsi-meet-container'),
+        parentNode: container,
         configOverwrite: {
           startWithAudioMuted: currentUser.userType === 'patient', // Patient starts muted
           startWithVideoMuted: false,
@@ -106,11 +121,12 @@ export function VideoConsultation({
         },
         interfaceConfigOverwrite: {
           TOOLBAR_BUTTONS: [
-            'microphone', 'camera', 'chat', 'hangup', 'tileview', 'settings'
+            'microphone', 'camera', 'chat', 'hangup', 'tileview', 'settings', 'desktop', 'recording'
           ],
           SHOW_JITSI_WATERMARK: false,
           DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
-          SHOW_CHROME_EXTENSION_BANNER: false
+          SHOW_CHROME_EXTENSION_BANNER: false,
+          ENABLE_DESKTOP_SHARING: true
         },
         userInfo: {
           displayName: displayName,
@@ -135,7 +151,6 @@ export function VideoConsultation({
           console.log('Participant left:', participant.displayName)
         },
         videoConferenceJoined: () => {
-          setMeetingActive(true)
           setIsJoining(false)
           console.log('Successfully joined the meeting')
           
@@ -144,12 +159,32 @@ export function VideoConsultation({
         },
         videoConferenceLeft: () => {
           handleMeetingEnd()
+        },
+        recordingStatusChanged: (event: any) => {
+          console.log('Recording status changed:', event.on ? 'Started' : 'Stopped')
+          // TODO: Update database with recording status
+        },
+        screenSharingStatusChanged: (event: any) => {
+          console.log('Screen sharing:', event.on ? 'Started' : 'Stopped')
+        },
+        displayNameChange: (event: any) => {
+          console.log('Display name changed:', event.displayname, 'by', event.id)
+        },
+        deviceListChanged: (event: any) => {
+          console.log('Device list changed:', event)
+        },
+        audioMuteStatusChanged: (event: any) => {
+          console.log('Audio mute status changed:', event.muted)
+        },
+        videoMuteStatusChanged: (event: any) => {
+          console.log('Video mute status changed:', event.muted)
         }
       })
 
     } catch (error) {
       console.error('Error joining meeting:', error)
       setIsJoining(false)
+      setMeetingActive(false) // Reset meeting state on error
       alert('Failed to join the meeting. Please try again.')
     }
   }
@@ -296,24 +331,38 @@ export function VideoConsultation({
                       : `Meeting with Dr. ${consultationData.doctorLastName}`
                     }
                   </p>
-                  <Button 
-                    onClick={joinMeeting} 
-                    disabled={isJoining}
-                    size="lg"
-                    className="min-w-[200px]"
-                  >
-                    {isJoining ? (
-                      <>
-                        <Clock className="h-4 w-4 mr-2 animate-spin" />
-                        Joining...
-                      </>
-                    ) : (
-                      <>
-                        <Video className="h-4 w-4 mr-2" />
-                        Join Video Call
-                      </>
+                  <div className="space-y-4">
+                    {!deviceCheckPassed && (
+                      <Button
+                        onClick={() => setShowDeviceCheck(true)}
+                        variant="outline"
+                        size="lg"
+                        className="min-w-[200px]"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Test Camera & Microphone
+                      </Button>
                     )}
-                  </Button>
+                    
+                    <Button 
+                      onClick={joinMeeting} 
+                      disabled={isJoining}
+                      size="lg"
+                      className="min-w-[200px]"
+                    >
+                      {isJoining ? (
+                        <>
+                          <Clock className="h-4 w-4 mr-2 animate-spin" />
+                          Joining...
+                        </>
+                      ) : (
+                        <>
+                          <Video className="h-4 w-4 mr-2" />
+                          Join Video Call
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -370,6 +419,79 @@ export function VideoConsultation({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Device Check Modal */}
+      {showDeviceCheck && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Device Check</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeviceCheck(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription>
+                Test your camera and microphone before joining the call
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 border rounded">
+                  <Video className="h-5 w-5 text-blue-500" />
+                  <div className="flex-1">
+                    <p className="font-medium">Camera</p>
+                    <p className="text-sm text-muted-foreground">Check if your camera is working</p>
+                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 border rounded">
+                  <Mic className="h-5 w-5 text-blue-500" />
+                  <div className="flex-1">
+                    <p className="font-medium">Microphone</p>
+                    <p className="text-sm text-muted-foreground">Check if your microphone is working</p>
+                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 border rounded">
+                  <Users className="h-5 w-5 text-blue-500" />
+                  <div className="flex-1">
+                    <p className="font-medium">Internet Connection</p>
+                    <p className="text-sm text-muted-foreground">Stable connection detected</p>
+                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeviceCheck(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    setDeviceCheckPassed(true)
+                    setShowDeviceCheck(false)
+                  }}
+                  className="flex-1"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  All Good
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )

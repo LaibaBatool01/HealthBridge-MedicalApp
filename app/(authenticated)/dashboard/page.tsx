@@ -15,7 +15,10 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  DollarSign
+  DollarSign,
+  Users,
+  UserCheck,
+  Shield
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,13 +36,20 @@ export default async function DashboardPage() {
   const dashboardData = await getDashboardData()
   const isPatient = medicalUser.userType === "patient"
   const isDoctor = medicalUser.userType === "doctor"
+  const isAdmin = medicalUser.userType === "admin"
 
   return (
     <div className="space-y-6">
       {isPatient ? (
         <PatientDashboard user={medicalUser} data={dashboardData} />
-      ) : (
+      ) : isDoctor ? (
         <DoctorDashboard user={medicalUser} data={dashboardData} />
+      ) : isAdmin ? (
+        <AdminDashboard user={medicalUser} data={dashboardData} />
+      ) : (
+        <div className="text-center py-8">
+          <p>Invalid user type</p>
+        </div>
       )}
     </div>
   )
@@ -389,6 +399,166 @@ function PatientDashboard({ user, data }: { user: any; data: any }) {
           </Card>
         </div>
       </div>
+    </div>
+  )
+}
+
+function AdminDashboard({ user, data }: { user: any; data: any }) {
+  const userName = getUserDisplayName(user)
+
+  return (
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome, {userName}! 🛡️
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Admin dashboard - Platform management and oversight
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button asChild className="gap-2">
+            <Link href="/dashboard/admin">
+              <UserCheck className="h-4 w-4" />
+              Doctor Verification
+            </Link>
+          </Button>
+          <Button variant="outline" asChild className="gap-2">
+            <Link href="/dashboard/admin/analytics">
+              <Activity className="h-4 w-4" />
+              Analytics
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-4">
+        {/* Admin Stats */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data.totalUsersCount}</div>
+            <p className="text-xs text-muted-foreground">Active platform users</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Doctors</CardTitle>
+            <Stethoscope className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data.totalDoctorsCount}</div>
+            <p className="text-xs text-muted-foreground">Registered medical professionals</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Verification</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{data.pendingDoctorsCount}</div>
+            <p className="text-xs text-muted-foreground">Doctors awaiting approval</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Consultations</CardTitle>
+            <MessageCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data.monthlyConsultationsCount}</div>
+            <p className="text-xs text-muted-foreground">This month's activity</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Admin Quick Actions</CardTitle>
+          <CardDescription>
+            Common administrative tasks and management tools
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Button variant="outline" asChild className="h-auto p-4 justify-start">
+              <Link href="/dashboard/admin">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <UserCheck className="h-4 w-4 text-yellow-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">Doctor Verification</p>
+                    <p className="text-sm text-muted-foreground">Review pending applications</p>
+                  </div>
+                </div>
+              </Link>
+            </Button>
+
+            <Button variant="outline" asChild className="h-auto p-4 justify-start">
+              <Link href="/dashboard/admin/users">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">User Management</p>
+                    <p className="text-sm text-muted-foreground">Manage platform users</p>
+                  </div>
+                </div>
+              </Link>
+            </Button>
+
+            <Button variant="outline" asChild className="h-auto p-4 justify-start">
+              <Link href="/dashboard/admin/analytics">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Activity className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">Platform Analytics</p>
+                    <p className="text-sm text-muted-foreground">View usage statistics</p>
+                  </div>
+                </div>
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pending Verifications Alert */}
+      {data.pendingDoctorsCount > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-8 w-8 text-yellow-600" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-yellow-800">
+                  {data.pendingDoctorsCount} Doctor{data.pendingDoctorsCount > 1 ? 's' : ''} Awaiting Verification
+                </h3>
+                <p className="text-sm text-yellow-700">
+                  New doctor applications are waiting for your review and approval.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/admin">
+                  Review Now
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

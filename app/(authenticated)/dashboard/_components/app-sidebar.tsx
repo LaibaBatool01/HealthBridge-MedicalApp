@@ -12,7 +12,10 @@ import {
   Users,
   Search,
   MessageCircle,
-  Pill
+  Pill,
+  Shield,
+  UserCheck,
+  BarChart3
 } from "lucide-react"
 import * as React from "react"
 
@@ -126,6 +129,10 @@ export function AppSidebar({
         {
           title: "Today's Schedule",
           url: "/dashboard/schedule"
+        },
+        {
+          title: "Verification Status",
+          url: "/dashboard/verification-status"
         }
       ]
     },
@@ -184,16 +191,129 @@ export function AppSidebar({
     }
   ]
 
+  // Admin Navigation
+  const adminNavigation = [
+    {
+      title: "Admin Overview",
+      url: "/dashboard",
+      icon: Activity,
+      isActive: true,
+      items: [
+        {
+          title: "Dashboard",
+          url: "/dashboard"
+        },
+        {
+          title: "System Stats",
+          url: "/dashboard/admin/stats"
+        }
+      ]
+    },
+    {
+      title: "Doctor Management",
+      url: "#",
+      icon: UserCheck,
+      items: [
+        {
+          title: "Verification Queue",
+          url: "/dashboard/admin"
+        },
+        {
+          title: "All Doctors",
+          url: "/dashboard/admin/doctors"
+        },
+        {
+          title: "Verification Reports",
+          url: "/dashboard/admin/reports"
+        }
+      ]
+    },
+    {
+      title: "Platform Analytics",
+      url: "#",
+      icon: BarChart3,
+      items: [
+        {
+          title: "User Analytics",
+          url: "/dashboard/admin/analytics"
+        },
+        {
+          title: "Consultation Reports",
+          url: "/dashboard/admin/consultations"
+        },
+        {
+          title: "Financial Reports",
+          url: "/dashboard/admin/finances"
+        }
+      ]
+    },
+    {
+      title: "System Settings",
+      url: "#",
+      icon: Settings2,
+      items: [
+        {
+          title: "Platform Settings",
+          url: "/dashboard/admin/settings"
+        },
+        {
+          title: "User Management",
+          url: "/dashboard/admin/users"
+        },
+        {
+          title: "Support Tickets",
+          url: "/dashboard/admin/support"
+        }
+      ]
+    }
+  ]
+
+  const getNavigationForUserType = (userType: string) => {
+    switch (userType) {
+      case "patient":
+        return patientNavigation
+      case "doctor":
+        return doctorNavigation
+      case "admin":
+        return adminNavigation
+      default:
+        return patientNavigation
+    }
+  }
+
+  const getTeamConfig = (userType: string) => {
+    switch (userType) {
+      case "patient":
+        return {
+          name: "My Health",
+          logo: Heart,
+          plan: "Patient Account"
+        }
+      case "doctor":
+        return {
+          name: "My Practice",
+          logo: Stethoscope,
+          plan: "Doctor Account"
+        }
+      case "admin":
+        return {
+          name: "HealthBridge Admin",
+          logo: Shield,
+          plan: "Administrator"
+        }
+      default:
+        return {
+          name: "My Health",
+          logo: Heart,
+          plan: "Patient Account"
+        }
+    }
+  }
+
   const data = {
     user: userData,
-    teams: [
-      {
-        name: userData.userType === "patient" ? "My Health" : "My Practice",
-        logo: userData.userType === "patient" ? Heart : Stethoscope,
-        plan: userData.userType === "patient" ? "Patient Account" : "Doctor Account"
-      }
-    ],
-    navMain: userData.userType === "patient" ? patientNavigation : doctorNavigation
+    teams: [getTeamConfig(userData.userType)],
+    navMain: getNavigationForUserType(userData.userType)
   }
 
   return (

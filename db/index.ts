@@ -11,6 +11,7 @@ import { consultations } from "./schema/consultations"
 import { prescriptions } from "./schema/prescriptions"
 import { symptoms } from "./schema/symptoms"
 import { reminders } from "./schema/reminders"
+import { messages } from "./schema/messages"
 
 config({ path: ".env.local" })
 
@@ -28,7 +29,8 @@ const dbSchema = {
   consultations,
   prescriptions,
   symptoms,
-  reminders
+  reminders,
+  messages
   // relations can be added here later
 }
 
@@ -48,3 +50,4 @@ export * from "./schema/consultations"
 export * from "./schema/prescriptions"
 export * from "./schema/symptoms"
 export * from "./schema/reminders"
+export * from "./schema/messages"

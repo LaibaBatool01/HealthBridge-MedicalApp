@@ -22,6 +22,8 @@ export async function getDashboardData() {
     return await getPatientDashboardData(currentDbUser.id)
   } else if (currentDbUser.userType === "doctor") {
     return await getDoctorDashboardData(currentDbUser.id)
+  } else if (currentDbUser.userType === "admin") {
+    return await getAdminDashboardData(currentDbUser.id)
   }
   
   throw new Error("Invalid user type")
@@ -195,5 +197,49 @@ async function getDoctorDashboardData(userId: string) {
     upcomingAppointments,
     rating: doctor[0].rating || 0,
     totalRatings: doctor[0].totalRatings || 0
+  }
+}
+
+async function getAdminDashboardData(userId: string) {
+  // Get admin statistics
+  
+  // Total users count
+  const totalUsers = await db
+    .select({ count: count() })
+    .from(users)
+    .where(eq(users.isActive, true))
+
+  // Total doctors count
+  const totalDoctors = await db
+    .select({ count: count() })
+    .from(doctors)
+
+  // Pending doctor verifications
+  const pendingDoctors = await db
+    .select({ count: count() })
+    .from(doctors)
+    .where(eq(doctors.verificationStatus, "pending"))
+
+  // Total patients count
+  const totalPatients = await db
+    .select({ count: count() })
+    .from(patients)
+
+  // Total consultations this month
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+  
+  const monthlyConsultations = await db
+    .select({ count: count() })
+    .from(consultations)
+    .where(gte(consultations.scheduledAt, startOfMonth))
+
+  return {
+    totalUsersCount: totalUsers[0]?.count || 0,
+    totalDoctorsCount: totalDoctors[0]?.count || 0,
+    pendingDoctorsCount: pendingDoctors[0]?.count || 0,
+    totalPatientsCount: totalPatients[0]?.count || 0,
+    monthlyConsultationsCount: monthlyConsultations[0]?.count || 0
   }
 }
