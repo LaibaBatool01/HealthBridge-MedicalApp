@@ -65,7 +65,7 @@ export async function getDoctorConsultationNotes(): Promise<ConsultationNoteData
         consultationType: consultations.consultationType,
         symptoms: consultations.symptoms,
         diagnosis: consultations.diagnosis,
-        notes: consultations.notes,
+        notes: consultations.doctorNotes,
         prescriptionGiven: sql<boolean>`CASE WHEN EXISTS(
           SELECT 1 FROM prescriptions p WHERE p.consultation_id = ${consultations.id}
         ) THEN true ELSE false END`,
@@ -112,7 +112,7 @@ export async function getRecentConsultationNotes(days: number = 7): Promise<Cons
         consultationType: consultations.consultationType,
         symptoms: consultations.symptoms,
         diagnosis: consultations.diagnosis,
-        notes: consultations.notes,
+        notes: consultations.doctorNotes,
         prescriptionGiven: sql<boolean>`CASE WHEN EXISTS(
           SELECT 1 FROM prescriptions p WHERE p.consultation_id = ${consultations.id}
         ) THEN true ELSE false END`,
@@ -159,7 +159,7 @@ export async function getConsultationNotesWithFollowUp(): Promise<ConsultationNo
         consultationType: consultations.consultationType,
         symptoms: consultations.symptoms,
         diagnosis: consultations.diagnosis,
-        notes: consultations.notes,
+        notes: consultations.doctorNotes,
         prescriptionGiven: sql<boolean>`CASE WHEN EXISTS(
           SELECT 1 FROM prescriptions p WHERE p.consultation_id = ${consultations.id}
         ) THEN true ELSE false END`,
@@ -206,7 +206,7 @@ export async function getConsultationNotesWithPrescriptions(): Promise<Consultat
         consultationType: consultations.consultationType,
         symptoms: consultations.symptoms,
         diagnosis: consultations.diagnosis,
-        notes: consultations.notes,
+        notes: consultations.doctorNotes,
         prescriptionGiven: sql<boolean>`true`,
         followUpRequired: consultations.followUpRequired,
         followUpDate: consultations.followUpDate,
