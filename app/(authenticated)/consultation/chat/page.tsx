@@ -16,81 +16,110 @@ import {
   Circle,
   Stethoscope,
   Clock,
-  CheckCircle
+  CheckCircle,
+  AlertCircle,
+  Loader2
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useMessages } from "@/hooks/use-messages"
+import { getConsultationById } from "@/actions/consultations"
+import { getDoctorById } from "@/actions/doctors"
 
-type Message = {
+interface Consultation {
   id: string
-  sender: "patient" | "doctor"
-  message: string
-  timestamp: Date
-  type: "text" | "prescription" | "system"
+  doctor_id: string
+  patient_id: string
+  consultation_type: string
+  status: string
+  scheduled_at: Date
+  symptoms?: string | null
+  [key: string]: any // Allow additional properties from the database
 }
 
-type Doctor = {
+interface Doctor {
   id: string
   name: string
   specialty: string
-  isOnline: boolean
+  rating: number
+  consultationFee: number
   avatar?: string
+  bio?: string
+  yearsOfExperience?: number
+  isAvailable: boolean
+  isOnline?: boolean // Add this for the UI
 }
-
-// Mock messages for demo
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    sender: "doctor",
-    message: "Hello! I'm Dr. Johnson. I see you've reported chest pain and fatigue. Can you tell me more about when these symptoms started?",
-    timestamp: new Date(Date.now() - 300000),
-    type: "text"
-  },
-  {
-    id: "2",
-    sender: "patient", 
-    message: "Hi Doctor. The chest pain started about 3 days ago, and I've been feeling very tired for the past week.",
-    timestamp: new Date(Date.now() - 240000),
-    type: "text"
-  },
-  {
-    id: "3",
-    sender: "doctor",
-    message: "I understand. On a scale of 1-10, how would you rate the chest pain? And does it worsen with physical activity?",
-    timestamp: new Date(Date.now() - 180000),
-    type: "text"
-  },
-  {
-    id: "4",
-    sender: "patient",
-    message: "I'd say it's about a 6/10, and yes, it gets worse when I walk up stairs or exercise.",
-    timestamp: new Date(Date.now() - 120000),
-    type: "text"
-  }
-]
 
 function ChatConsultationPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
-  const [messages, setMessages] = useState<Message[]>(mockMessages)
   const [newMessage, setNewMessage] = useState("")
+  const [consultation, setConsultation] = useState<Consultation | null>(null)
   const [doctor, setDoctor] = useState<Doctor | null>(null)
-  const [consultationStarted, setConsultationStarted] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  // Get consultation ID from URL params
+  const consultationId = searchParams.get("id") || searchParams.get("consultationId") || ""
+
+  // Use the real-time messages hook
+  const { 
+    messages, 
+    loading: messagesLoading, 
+    error: messagesError,
+    sendMessage,
+    sendingMessage 
+  } = useMessages({ 
+    consultationId,
+    enabled: !!consultationId 
+  })
+
+  // Fetch consultation and doctor data
   useEffect(() => {
-    const doctorId = searchParams.get("doctor")
-    
-    // Mock doctor data
-    setDoctor({
-      id: doctorId || "1",
-      name: "Dr. Sarah Johnson",
-      specialty: "Cardiology",
-      isOnline: true,
-      avatar: undefined
-    })
-  }, [searchParams])
+    async function fetchData() {
+      if (!consultationId) {
+        setError("No consultation ID provided")
+        setLoading(false)
+        return
+      }
 
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Fetch consultation details
+        const consultationData = await getConsultationById(consultationId)
+        if (!consultationData) {
+          throw new Error("Consultation not found")
+        }
+
+        setConsultation(consultationData as Consultation)
+
+        // Fetch doctor details
+        const doctorData = await getDoctorById((consultationData as any).doctor_id)
+        if (!doctorData) {
+          throw new Error("Doctor not found")
+        }
+
+        // Add isOnline status (you can implement real logic later)
+        setDoctor({
+          ...doctorData,
+          isOnline: true // Default to online for now
+        })
+
+      } catch (err) {
+        console.error("Error fetching consultation data:", err)
+        setError(err instanceof Error ? err.message : "Failed to load consultation")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [consultationId])
+
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom()
   }, [messages])
@@ -99,49 +128,16 @@ function ChatConsultationPageContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage) return
 
-    const message: Message = {
-      id: Date.now().toString(),
-      sender: "patient",
-      message: newMessage,
-      timestamp: new Date(),
-      type: "text"
+    try {
+      await sendMessage(newMessage.trim())
+      setNewMessage("")
+    } catch (err) {
+      console.error("Error sending message:", err)
+      alert("Failed to send message. Please try again.")
     }
-
-    setMessages([...messages, message])
-    setNewMessage("")
-
-    // Simulate doctor response after a delay
-    setTimeout(() => {
-      const doctorResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: "doctor",
-        message: getAutomaticResponse(newMessage),
-        timestamp: new Date(),
-        type: "text"
-      }
-      setMessages(prev => [...prev, doctorResponse])
-    }, 2000)
-  }
-
-  const getAutomaticResponse = (patientMessage: string) => {
-    const lowerMessage = patientMessage.toLowerCase()
-    
-    if (lowerMessage.includes("pain") || lowerMessage.includes("hurt")) {
-      return "I understand you're experiencing pain. Can you describe the exact location and what type of pain it is - sharp, dull, aching, or burning?"
-    }
-    
-    if (lowerMessage.includes("tired") || lowerMessage.includes("fatigue")) {
-      return "Fatigue can have many causes. Have you noticed any other symptoms like shortness of breath, dizziness, or changes in your appetite?"
-    }
-    
-    if (lowerMessage.includes("thank") || lowerMessage.includes("appreciate")) {
-      return "You're welcome! Based on our conversation, I'm going to prescribe some tests and medication. Is there anything else you'd like to discuss?"
-    }
-    
-    return "Thank you for that information. Let me review your symptoms. Based on what you've told me, I recommend we run some tests to get a clearer picture."
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -159,11 +155,33 @@ function ChatConsultationPageContent() {
     router.push("/dashboard?consultation=completed")
   }
 
-  if (!doctor) {
+  const handleSwitchToVideo = () => {
+    if (consultation) {
+      router.push(`/consultation/video?id=${consultation.id}`)
+    }
+  }
+
+  // Loading state
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-4">Loading consultation...</h2>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error || !consultation || !doctor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Error Loading Consultation</h2>
+          <p className="text-muted-foreground mb-4">{error || "Consultation or doctor not found"}</p>
+          <Button onClick={() => router.back()}>Go Back</Button>
         </div>
       </div>
     )
@@ -200,10 +218,15 @@ function ChatConsultationPageContent() {
 
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="gap-1">
-                <Clock className="h-3 w-3" />
-                Chat Active
+                <Circle className={`h-3 w-3 fill-current ${messagesLoading ? 'text-yellow-500' : 'text-green-500'}`} />
+                {messagesLoading ? 'Connecting...' : 'Chat Active'}
               </Badge>
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2"
+                onClick={handleSwitchToVideo}
+              >
                 <Video className="h-4 w-4" />
                 Switch to Video
               </Button>
@@ -226,35 +249,83 @@ function ChatConsultationPageContent() {
                 <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm">
                   <Stethoscope className="h-4 w-4" />
                   Consultation started with {doctor.name}
+                  {consultation.symptoms && (
+                    <span className="text-xs ml-2">• Symptoms: {consultation.symptoms}</span>
+                  )}
                 </div>
               </div>
 
-              {/* Messages */}
-              {messages.map((message) => (
-                <div key={message.id} className={`flex ${message.sender === "patient" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-xs lg:max-w-md ${message.sender === "patient" ? "order-2" : "order-1"}`}>
-                    <div className={`rounded-2xl px-4 py-3 ${
-                      message.sender === "patient" 
-                        ? "bg-blue-600 text-white" 
-                        : "bg-gray-100 text-gray-900"
-                    }`}>
-                      <p className="text-sm">{message.message}</p>
-                    </div>
-                    <p className={`text-xs text-muted-foreground mt-1 ${
-                      message.sender === "patient" ? "text-right" : "text-left"
-                    }`}>
-                      {formatTime(message.timestamp)}
-                    </p>
-                  </div>
-                  
-                  <Avatar className={`h-8 w-8 ${message.sender === "patient" ? "order-1 mr-2" : "order-2 ml-2"}`}>
-                    <AvatarImage src={message.sender === "doctor" ? doctor.avatar : undefined} />
-                    <AvatarFallback className={message.sender === "patient" ? "bg-blue-100" : "bg-gray-100"}>
-                      {message.sender === "patient" ? "P" : doctor.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
+              {/* Messages Loading */}
+              {messagesLoading && messages.length === 0 && (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Loading messages...</p>
                 </div>
-              ))}
+              )}
+
+              {/* Messages Error */}
+              {messagesError && (
+                <div className="text-center py-4">
+                  <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
+                  <p className="text-sm text-red-600">{messagesError}</p>
+                </div>
+              )}
+
+              {/* Messages */}
+              {messages.map((message) => {
+                const isCurrentUser = message.senderType === "patient" // Assuming current user is patient
+                return (
+                  <div key={message.id} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-xs lg:max-w-md ${isCurrentUser ? "order-2" : "order-1"}`}>
+                      <div className={`rounded-2xl px-4 py-3 ${
+                        isCurrentUser 
+                          ? "bg-blue-600 text-white" 
+                          : "bg-gray-100 text-gray-900"
+                      }`}>
+                        <p className="text-sm">{message.content}</p>
+                        {message.messageType === "prescription" && (
+                          <div className="mt-2 p-2 bg-white/20 rounded-lg">
+                            <p className="text-xs font-medium">💊 Prescription</p>
+                          </div>
+                        )}
+                        {message.messageType === "system" && (
+                          <div className="text-xs opacity-75 mt-1">
+                            System message
+                          </div>
+                        )}
+                      </div>
+                      <div className={`flex items-center gap-1 mt-1 ${
+                        isCurrentUser ? "justify-end" : "justify-start"
+                      }`}>
+                        <p className="text-xs text-muted-foreground">
+                          {message.senderName} • {formatTime(new Date(message.createdAt))}
+                        </p>
+                        {message.status === "read" && isCurrentUser && (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        )}
+                      </div>
+                    </div>
+                    
+                    <Avatar className={`h-8 w-8 ${isCurrentUser ? "order-1 mr-2" : "order-2 ml-2"}`}>
+                      <AvatarImage src={message.senderType === "doctor" ? doctor.avatar : undefined} />
+                      <AvatarFallback className={isCurrentUser ? "bg-blue-100" : "bg-gray-100"}>
+                        {message.senderType === "patient" ? "P" : doctor.name.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                )
+              })}
+
+              {/* Empty state */}
+              {!messagesLoading && messages.length === 0 && !messagesError && (
+                <div className="text-center py-8">
+                  <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-medium mb-2">Start the conversation</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Send your first message to {doctor.name} to begin the consultation.
+                  </p>
+                </div>
+              )}
               
               <div ref={messagesEndRef} />
             </CardContent>
@@ -262,7 +333,7 @@ function ChatConsultationPageContent() {
             {/* Message Input */}
             <div className="border-t p-4">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" disabled>
                   <Paperclip className="h-4 w-4" />
                 </Button>
                 <Input
@@ -270,14 +341,25 @@ function ChatConsultationPageContent() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
+                  disabled={sendingMessage}
                   className="flex-1"
                 />
-                <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
-                  <Send className="h-4 w-4" />
+                <Button 
+                  onClick={handleSendMessage} 
+                  disabled={!newMessage.trim() || sendingMessage}
+                >
+                  {sendingMessage ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 Press Enter to send, Shift+Enter for new line
+                {messagesError && (
+                  <span className="text-red-500 ml-2">• {messagesError}</span>
+                )}
               </p>
             </div>
           </Card>
@@ -305,7 +387,7 @@ function ChatConsultationPageContent() {
                   <p className="text-sm text-muted-foreground mb-3">
                     Continue with video call
                   </p>
-                  <Button variant="outline" size="sm">Start Video Call</Button>
+                  <Button variant="outline" size="sm" onClick={handleSwitchToVideo}>Start Video Call</Button>
                 </div>
               </CardContent>
             </Card>

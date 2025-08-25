@@ -1,281 +1,178 @@
-"use client"
-
-import { useState, useEffect, Suspense } from "react"
+import { Suspense } from "react"
+import { getConsultationById } from "@/actions/consultations"
+import { VideoConsultation } from "@/components/video-consultation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { 
-  Video, 
-  VideoOff,
-  Mic, 
-  MicOff,
-  Phone,
-  MessageCircle,
-  Settings,
-  ArrowLeft,
-  Circle,
-  Users,
-  Monitor,
-  Camera
-} from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { ArrowLeft, Video } from "lucide-react"
+import Link from "next/link"
 
-type Doctor = {
-  id: string
-  name: string
-  specialty: string
-  isOnline: boolean
-  avatar?: string
+interface VideoConsultationPageProps {
+  searchParams: Promise<{ 
+    id?: string 
+    consultationId?: string
+  }>
 }
 
-function VideoConsultationPageContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+async function VideoConsultationPageContent({ searchParams }: VideoConsultationPageProps) {
+  // Get consultation ID from search params
+  const params = await searchParams
+  const consultationId = params.id || params.consultationId
   
-  const [doctor, setDoctor] = useState<Doctor | null>(null)
-  const [isVideoOn, setIsVideoOn] = useState(true)
-  const [isAudioOn, setIsAudioOn] = useState(true)
-  const [callDuration, setCallDuration] = useState(0)
-  const [isConnected, setIsConnected] = useState(true)
-
-  useEffect(() => {
-    const doctorId = searchParams.get("doctor")
-    
-    // Mock doctor data
-    setDoctor({
-      id: doctorId || "1",
-      name: "Dr. Sarah Johnson",
-      specialty: "Cardiology",
-      isOnline: true,
-      avatar: undefined
-    })
-
-    // Start call timer
-    const timer = setInterval(() => {
-      setCallDuration(prev => prev + 1)
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [searchParams])
-
-  const formatCallDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const handleEndCall = () => {
-    router.push("/dashboard?consultation=completed")
-  }
-
-  const toggleVideo = () => {
-    setIsVideoOn(!isVideoOn)
-  }
-
-  const toggleAudio = () => {
-    setIsAudioOn(!isAudioOn)
-  }
-
-  if (!doctor) {
+  if (!consultationId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Loading video consultation...</h2>
+        <div className="text-center space-y-4">
+          <Video className="h-16 w-16 mx-auto text-gray-400" />
+          <h2 className="text-2xl font-bold">No Consultation Found</h2>
+          <p className="text-gray-600">Please provide a valid consultation ID.</p>
+          <Link href="/dashboard">
+            <Button>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/50 to-transparent p-6">
-        <div className="flex items-center justify-between">
+  try {
+    // Fetch consultation data
+    const consultation = await getConsultationById(consultationId)
+
+    return (
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => router.back()} className="text-white hover:bg-white/20">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={doctor.avatar} />
-                <AvatarFallback className="bg-blue-100 text-gray-900">
-                  {doctor.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-              
-              <div>
-                <h3 className="font-semibold">{doctor.name}</h3>
-                <div className="flex items-center gap-2">
-                  <Circle className="h-3 w-3 fill-green-500 text-green-500" />
-                  <span className="text-sm text-gray-300">
-                    {doctor.specialty} • Connected
-                  </span>
+            <Link href="/dashboard">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold">Video Consultation</h1>
+              <p className="text-muted-foreground">
+                {consultation.currentUser.userType === 'doctor' 
+                  ? `Meeting with ${consultation.patientFirstName} ${consultation.patientLastName}`
+                  : `Meeting with Dr. ${consultation.doctorLastName}`
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Video Area */}
+          <div className="lg:col-span-2">
+            <VideoConsultation
+              consultationId={consultationId}
+              consultationData={{
+                ...consultation,
+                video_room_name: consultation.video_room_name || `healthcare-${consultation.id}`,
+                scheduled_at: consultation.scheduled_at.toISOString(),
+                meeting_status: consultation.meeting_status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
+                doctorFirstName: consultation.doctorFirstName || undefined,
+                doctorLastName: consultation.doctorLastName || undefined,
+                patientFirstName: consultation.patientFirstName || undefined,
+                patientLastName: consultation.patientLastName || undefined
+              }}
+              currentUser={{
+                ...consultation.currentUser,
+                userType: consultation.currentUser.userType as 'doctor' | 'patient'
+              }}
+            />
+          </div>
+
+          {/* Consultation Details Sidebar */}
+          <div className="space-y-4">
+            {/* Consultation Info */}
+            <div className="bg-card text-card-foreground rounded-lg border p-6">
+              <h3 className="font-semibold mb-4">Consultation Details</h3>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Scheduled:</span>
+                  <p className="font-medium">
+                    {new Date(consultation.scheduled_at).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Status:</span>
+                  <p className="font-medium capitalize">{consultation.status}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Meeting Status:</span>
+                  <p className="font-medium capitalize">{consultation.meeting_status}</p>
+                </div>
+                {consultation.consultation_fee && (
+                  <div>
+                    <span className="text-muted-foreground">Fee:</span>
+                    <p className="font-medium">${consultation.consultation_fee}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Symptoms */}
+            {consultation.symptoms && (
+              <div className="bg-card text-card-foreground rounded-lg border p-6">
+                <h3 className="font-semibold mb-4">Reported Symptoms</h3>
+                <div className="text-sm">
+                  {JSON.parse(consultation.symptoms).map((symptom: string, index: number) => (
+                    <div key={index} className="mb-2 p-2 bg-muted rounded">
+                      {symptom}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
-          </div>
+            )}
 
-          <div className="flex items-center gap-4">
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              {formatCallDuration(callDuration)}
-            </Badge>
-            
-            <Badge variant="secondary" className="bg-green-500/20 text-green-300 border-green-400/30">
-              <Circle className="h-3 w-3 fill-green-400 text-green-400 mr-1" />
-              Live
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Video Area */}
-      <div className="relative h-screen">
-        
-        {/* Doctor's Video (Main) */}
-        <div className="absolute inset-0">
-          <div className="h-full w-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center">
-            <div className="text-center">
-              <Avatar className="h-32 w-32 mx-auto mb-4">
-                <AvatarImage src={doctor.avatar} />
-                <AvatarFallback className="bg-blue-100 text-gray-900 text-4xl">
-                  {doctor.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-              <h2 className="text-2xl font-bold mb-2">{doctor.name}</h2>
-              <p className="text-blue-200">{doctor.specialty}</p>
-              <div className="mt-4 flex items-center justify-center gap-2">
-                <Video className="h-5 w-5" />
-                <span>Video consultation in progress</span>
+            {/* Doctor Notes */}
+            {consultation.doctor_notes && (
+              <div className="bg-card text-card-foreground rounded-lg border p-6">
+                <h3 className="font-semibold mb-4">Doctor's Notes</h3>
+                <p className="text-sm text-muted-foreground">
+                  {consultation.doctor_notes}
+                </p>
               </div>
-            </div>
-          </div>
-        </div>
+            )}
 
-        {/* Patient's Video (Picture-in-Picture) */}
-        <div className="absolute top-20 right-6 w-48 h-36 bg-gray-800 rounded-lg overflow-hidden border-2 border-white/30">
-          <div className="h-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
-            {isVideoOn ? (
-              <div className="text-center">
-                <Camera className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-400">Your Video</p>
-              </div>
-            ) : (
-              <div className="text-center">
-                <VideoOff className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-400">Camera Off</p>
+            {/* Diagnosis */}
+            {consultation.diagnosis && (
+              <div className="bg-card text-card-foreground rounded-lg border p-6">
+                <h3 className="font-semibold mb-4">Diagnosis</h3>
+                <p className="text-sm text-muted-foreground">
+                  {consultation.diagnosis}
+                </p>
               </div>
             )}
           </div>
         </div>
-
-        {/* Connection Status */}
-        <div className="absolute bottom-24 left-6">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-full ${
-            isConnected ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
-          }`}>
-            <Circle className={`h-3 w-3 fill-current ${isConnected ? 'text-green-400' : 'text-red-400'}`} />
-            <span className="text-sm">
-              {isConnected ? 'Stable Connection' : 'Connection Issues'}
-            </span>
-          </div>
-        </div>
       </div>
-
-      {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
-        <div className="flex items-center justify-center gap-4">
-          
-          {/* Audio Control */}
-          <Button
-            variant={isAudioOn ? "secondary" : "destructive"}
-            size="lg"
-            className="h-14 w-14 rounded-full"
-            onClick={toggleAudio}
-          >
-            {isAudioOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
-          </Button>
-
-          {/* Video Control */}
-          <Button
-            variant={isVideoOn ? "secondary" : "destructive"}
-            size="lg"
-            className="h-14 w-14 rounded-full"
-            onClick={toggleVideo}
-          >
-            {isVideoOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
-          </Button>
-
-          {/* End Call */}
-          <Button
-            variant="destructive"
-            size="lg"
-            className="h-14 w-14 rounded-full bg-red-500 hover:bg-red-600"
-            onClick={handleEndCall}
-          >
-            <Phone className="h-6 w-6 rotate-135" />
-          </Button>
-
-          {/* Chat */}
-          <Button
-            variant="secondary"
-            size="lg"
-            className="h-14 w-14 rounded-full"
-            onClick={() => router.push(`/consultation/chat?doctor=${doctor.id}`)}
-          >
-            <MessageCircle className="h-6 w-6" />
-          </Button>
-
-          {/* Settings */}
-          <Button
-            variant="outline"
-            size="lg"
-            className="h-14 w-14 rounded-full border-white/30 text-white hover:bg-white/20"
-          >
-            <Settings className="h-6 w-6" />
-          </Button>
-        </div>
-        
-        <div className="mt-4 text-center">
-          <p className="text-sm text-gray-400">
-            Video consultation with {doctor.name} • {formatCallDuration(callDuration)}
+    )
+  } catch (error) {
+    console.error("Error loading consultation:", error)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Video className="h-16 w-16 mx-auto text-red-400" />
+          <h2 className="text-2xl font-bold">Consultation Not Found</h2>
+          <p className="text-gray-600">
+            The consultation you're looking for doesn't exist or you don't have access to it.
           </p>
+          <Link href="/dashboard">
+            <Button>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
         </div>
       </div>
-
-      {/* Quick Actions Overlay */}
-      <div className="absolute top-1/2 right-6 transform -translate-y-1/2 space-y-3">
-        <Card className="bg-black/50 border-white/20">
-          <CardContent className="p-4">
-            <div className="text-center space-y-2">
-              <Monitor className="h-6 w-6 mx-auto text-blue-400" />
-              <p className="text-xs text-gray-300">Screen Share</p>
-              <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/20">
-                Share
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-black/50 border-white/20">
-          <CardContent className="p-4">
-            <div className="text-center space-y-2">
-              <Users className="h-6 w-6 mx-auto text-green-400" />
-              <p className="text-xs text-gray-300">Add Specialist</p>
-              <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/20">
-                Invite
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
+    )
+  }
 }
 
-export default function VideoConsultationPage() {
+export default function VideoConsultationPage({ searchParams }: VideoConsultationPageProps) {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
@@ -285,7 +182,7 @@ export default function VideoConsultationPage() {
         </div>
       </div>
     }>
-      <VideoConsultationPageContent />
+      <VideoConsultationPageContent searchParams={searchParams} />
     </Suspense>
   )
 } 

@@ -20,6 +20,12 @@ export const specialtyEnum = pgEnum("specialty", [
   "other"
 ])
 
+export const verificationStatusEnum = pgEnum("verification_status", [
+  "pending",
+  "approved", 
+  "rejected"
+])
+
 export const doctors = pgTable("doctors", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id).notNull(),
@@ -37,6 +43,10 @@ export const doctors = pgTable("doctors", {
   isAvailable: boolean("is_available").default(true),
   availableHours: text("available_hours"), // JSON string of availability schedule
   languages: text("languages"), // JSON string of languages spoken
+  verificationStatus: verificationStatusEnum("verification_status").default("pending").notNull(),
+  adminFeedback: text("admin_feedback"),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: uuid("verified_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 })

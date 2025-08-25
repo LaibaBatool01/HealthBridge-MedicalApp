@@ -1,8 +1,9 @@
 "use server"
 
 import { db, consultations, users, patients, doctors } from "@/db"
-import { eq, and } from "drizzle-orm"
+import { eq, and, desc, gte, lte } from "drizzle-orm"
 import { currentUser } from "@clerk/nextjs/server"
+import { getCurrentMedicalUser } from "./users"
 
 export async function getConsultationById(consultationId: string) {
   try {
@@ -89,6 +90,9 @@ export async function getConsultationById(consultationId: string) {
     // Return consultation data with all needed info
     return {
       id: consultation.id,
+      doctor_id: consultation.doctorId,
+      patient_id: consultation.patientId,
+      consultation_type: 'chat_only', // We can get this from the actual consultation data later
       scheduled_at: consultation.scheduledAt,
       status: consultation.status,
       symptoms: consultation.symptoms,
@@ -133,6 +137,179 @@ export async function generateVideoRoomName(consultationId: string) {
     return roomName
   } catch (error) {
     console.error("Error generating video room name:", error)
+    throw error
+  }
+}
+
+// Patient-specific consultation functions
+export async function getPatientConsultations() {
+  try {
+    const currentMedicalUser = await getCurrentMedicalUser()
+    if (!currentMedicalUser || currentMedicalUser.userType !== 'patient') {
+      throw new Error("Unauthorized - Patient access required")
+    }
+
+    // Get patient record
+    const patientRecord = await db
+      .select()
+      .from(patients)
+      .where(eq(patients.userId, currentMedicalUser.id))
+      .limit(1)
+
+    if (patientRecord.length === 0) {
+      throw new Error("Patient profile not found")
+    }
+
+    const patientId = patientRecord[0].id
+
+    // Get all consultations for this patient with doctor info
+    const consultationsList = await db
+      .select({
+        id: consultations.id,
+        scheduledAt: consultations.scheduledAt,
+        status: consultations.status,
+        consultationType: consultations.consultationType,
+        symptoms: consultations.symptoms,
+        diagnosis: consultations.diagnosis,
+        doctorNotes: consultations.doctorNotes,
+        consultationFee: consultations.consultationFee,
+        prescriptionGiven: consultations.prescriptionGiven,
+        followUpRequired: consultations.followUpRequired,
+        followUpDate: consultations.followUpDate,
+        videoRoomName: consultations.videoRoomName,
+        meetingStatus: consultations.meetingStatus,
+        createdAt: consultations.createdAt,
+        // Doctor info
+        doctorId: doctors.id,
+        doctorFirstName: users.firstName,
+        doctorLastName: users.lastName,
+        doctorSpecialty: doctors.specialty,
+        doctorRating: doctors.rating,
+        doctorProfileImage: users.profileImage
+      })
+      .from(consultations)
+      .leftJoin(doctors, eq(consultations.doctorId, doctors.id))
+      .leftJoin(users, eq(doctors.userId, users.id))
+      .where(eq(consultations.patientId, patientId))
+      .orderBy(desc(consultations.scheduledAt))
+
+    return consultationsList
+  } catch (error) {
+    console.error("Error fetching patient consultations:", error)
+    throw error
+  }
+}
+
+export async function getUpcomingConsultations() {
+  try {
+    const currentMedicalUser = await getCurrentMedicalUser()
+    if (!currentMedicalUser || currentMedicalUser.userType !== 'patient') {
+      throw new Error("Unauthorized - Patient access required")
+    }
+
+    // Get patient record
+    const patientRecord = await db
+      .select()
+      .from(patients)
+      .where(eq(patients.userId, currentMedicalUser.id))
+      .limit(1)
+
+    if (patientRecord.length === 0) {
+      throw new Error("Patient profile not found")
+    }
+
+    const patientId = patientRecord[0].id
+
+    // Get upcoming consultations
+    const upcomingList = await db
+      .select({
+        id: consultations.id,
+        scheduledAt: consultations.scheduledAt,
+        status: consultations.status,
+        consultationType: consultations.consultationType,
+        symptoms: consultations.symptoms,
+        consultationFee: consultations.consultationFee,
+        videoRoomName: consultations.videoRoomName,
+        meetingStatus: consultations.meetingStatus,
+        // Doctor info
+        doctorId: doctors.id,
+        doctorFirstName: users.firstName,
+        doctorLastName: users.lastName,
+        doctorSpecialty: doctors.specialty,
+        doctorRating: doctors.rating,
+        doctorProfileImage: users.profileImage
+      })
+      .from(consultations)
+      .leftJoin(doctors, eq(consultations.doctorId, doctors.id))
+      .leftJoin(users, eq(doctors.userId, users.id))
+      .where(and(
+        eq(consultations.patientId, patientId),
+        gte(consultations.scheduledAt, new Date())
+      ))
+      .orderBy(consultations.scheduledAt)
+
+    return upcomingList
+  } catch (error) {
+    console.error("Error fetching upcoming consultations:", error)
+    throw error
+  }
+}
+
+export async function getPastConsultations() {
+  try {
+    const currentMedicalUser = await getCurrentMedicalUser()
+    if (!currentMedicalUser || currentMedicalUser.userType !== 'patient') {
+      throw new Error("Unauthorized - Patient access required")
+    }
+
+    // Get patient record
+    const patientRecord = await db
+      .select()
+      .from(patients)
+      .where(eq(patients.userId, currentMedicalUser.id))
+      .limit(1)
+
+    if (patientRecord.length === 0) {
+      throw new Error("Patient profile not found")
+    }
+
+    const patientId = patientRecord[0].id
+
+    // Get past consultations
+    const pastList = await db
+      .select({
+        id: consultations.id,
+        scheduledAt: consultations.scheduledAt,
+        status: consultations.status,
+        consultationType: consultations.consultationType,
+        symptoms: consultations.symptoms,
+        diagnosis: consultations.diagnosis,
+        doctorNotes: consultations.doctorNotes,
+        consultationFee: consultations.consultationFee,
+        prescriptionGiven: consultations.prescriptionGiven,
+        followUpRequired: consultations.followUpRequired,
+        followUpDate: consultations.followUpDate,
+        // Doctor info
+        doctorId: doctors.id,
+        doctorFirstName: users.firstName,
+        doctorLastName: users.lastName,
+        doctorSpecialty: doctors.specialty,
+        doctorRating: doctors.rating,
+        doctorProfileImage: users.profileImage
+      })
+      .from(consultations)
+      .leftJoin(doctors, eq(consultations.doctorId, doctors.id))
+      .leftJoin(users, eq(doctors.userId, users.id))
+      .where(and(
+        eq(consultations.patientId, patientId),
+        lte(consultations.scheduledAt, new Date()),
+        eq(consultations.status, 'completed')
+      ))
+      .orderBy(desc(consultations.scheduledAt))
+
+    return pastList
+  } catch (error) {
+    console.error("Error fetching past consultations:", error)
     throw error
   }
 }

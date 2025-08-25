@@ -3,464 +3,540 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { motion } from "framer-motion"
 import { 
   Search, 
-  Plus, 
-  X, 
   AlertTriangle, 
+  CheckCircle, 
   Clock, 
-  MapPin, 
-  Thermometer,
   Heart,
   Brain,
-  Zap,
-  Eye,
+  Activity,
+  Thermometer,
   Stethoscope,
-  ArrowRight
+  ArrowRight,
+  Info,
+  Calendar,
+  MapPin
 } from "lucide-react"
 
-type Symptom = {
+interface Symptom {
   id: string
   name: string
   category: string
-  severity: "mild" | "moderate" | "severe"
-  duration: string
   description: string
+  severity: 'mild' | 'moderate' | 'severe' | 'critical'
+  duration: string
+  frequency: string
+  triggers?: string
+  associatedSymptoms?: string[]
+  bodyPart?: string
+  onsetDate?: Date
+  urgencyLevel: number
 }
 
-type SymptomCategory = {
-  id: string
-  name: string
-  icon: React.ComponentType<{ className?: string }>
-  color: string
-  symptoms: string[]
+interface AssessmentResult {
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  recommendations: string[]
+  shouldSeekCare: boolean
+  urgency: 'immediate' | 'within_24h' | 'within_week' | 'routine'
+  possibleConditions: string[]
 }
 
-const symptomCategories: SymptomCategory[] = [
-  {
-    id: "respiratory",
-    name: "Respiratory",
-    icon: Stethoscope,
-    color: "bg-blue-100 text-blue-700",
-    symptoms: ["Cough", "Shortness of breath", "Chest pain", "Wheezing", "Sore throat"]
-  },
-  {
-    id: "cardiovascular", 
-    name: "Heart & Circulation",
-    icon: Heart,
-    color: "bg-red-100 text-red-700",
-    symptoms: ["Chest pain", "Palpitations", "Dizziness", "Fatigue", "Swelling"]
-  },
-  {
-    id: "neurological",
-    name: "Neurological",
-    icon: Brain,
-    color: "bg-purple-100 text-purple-700", 
-    symptoms: ["Headache", "Dizziness", "Memory issues", "Numbness", "Seizures"]
-  },
-  {
-    id: "gastrointestinal",
-    name: "Digestive",
-    icon: Zap,
-    color: "bg-green-100 text-green-700",
-    symptoms: ["Nausea", "Vomiting", "Diarrhea", "Abdominal pain", "Constipation"]
-  },
-  {
-    id: "other",
-    name: "General",
-    icon: Thermometer,
-    color: "bg-yellow-100 text-yellow-700",
-    symptoms: ["Fever", "Fatigue", "Weight loss", "Night sweats", "Rash"]
-  }
+const symptomCategories = [
+  { value: 'respiratory', label: 'Respiratory', icon: Activity },
+  { value: 'cardiovascular', label: 'Cardiovascular', icon: Heart },
+  { value: 'neurological', label: 'Neurological', icon: Brain },
+  { value: 'gastrointestinal', label: 'Gastrointestinal', icon: Stethoscope },
+  { value: 'musculoskeletal', label: 'Musculoskeletal', icon: Activity },
+  { value: 'dermatological', label: 'Dermatological', icon: Thermometer },
+  { value: 'psychological', label: 'Psychological', icon: Brain },
+  { value: 'genitourinary', label: 'Genitourinary', icon: Stethoscope },
+  { value: 'endocrine', label: 'Endocrine', icon: Activity },
+  { value: 'other', label: 'Other', icon: Info }
+]
+
+const commonSymptoms = [
+  { name: 'Headache', category: 'neurological', severity: 'moderate' as const },
+  { name: 'Fever', category: 'other', severity: 'moderate' as const },
+  { name: 'Cough', category: 'respiratory', severity: 'mild' as const },
+  { name: 'Chest Pain', category: 'cardiovascular', severity: 'severe' as const },
+  { name: 'Nausea', category: 'gastrointestinal', severity: 'moderate' as const },
+  { name: 'Fatigue', category: 'other', severity: 'mild' as const },
+  { name: 'Shortness of Breath', category: 'respiratory', severity: 'severe' as const },
+  { name: 'Dizziness', category: 'neurological', severity: 'moderate' as const },
+  { name: 'Abdominal Pain', category: 'gastrointestinal', severity: 'moderate' as const },
+  { name: 'Joint Pain', category: 'musculoskeletal', severity: 'moderate' as const }
 ]
 
 export default function SymptomCheckerPage() {
-  const [selectedSymptoms, setSelectedSymptoms] = useState<Symptom[]>([])
-  const [currentSymptom, setCurrentSymptom] = useState({
-    name: "",
-    category: "",
-    severity: "" as "mild" | "moderate" | "severe" | "",
-    duration: "",
-    description: ""
-  })
-  const [showAssessment, setShowAssessment] = useState(false)
-  const [selectedBodyPart, setSelectedBodyPart] = useState("")
+  const [currentStep, setCurrentStep] = useState<'input' | 'assessment' | 'result'>('input')
+  const [symptoms, setSymptoms] = useState<Symptom[]>([])
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [symptomName, setSymptomName] = useState('')
+  const [symptomDescription, setSymptomDescription] = useState('')
+  const [severity, setSeverity] = useState<'mild' | 'moderate' | 'severe' | 'critical'>('moderate')
+  const [duration, setDuration] = useState('')
+  const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | null>(null)
+  const [isAssessing, setIsAssessing] = useState(false)
 
   const addSymptom = () => {
-    if (currentSymptom.name && currentSymptom.severity && currentSymptom.duration) {
+    if (!symptomName.trim() || !selectedCategory) return
+
       const newSymptom: Symptom = {
         id: Date.now().toString(),
-        name: currentSymptom.name,
-        category: currentSymptom.category,
-        severity: currentSymptom.severity,
-        duration: currentSymptom.duration,
-        description: currentSymptom.description
-      }
-      
-      setSelectedSymptoms([...selectedSymptoms, newSymptom])
-      setCurrentSymptom({
-        name: "",
-        category: "",
-        severity: "",
-        duration: "",
-        description: ""
-      })
+      name: symptomName,
+      category: selectedCategory,
+      description: symptomDescription,
+      severity,
+      duration,
+      frequency: 'constant',
+      urgencyLevel: severity === 'critical' ? 5 : severity === 'severe' ? 4 : severity === 'moderate' ? 3 : 2,
+      onsetDate: new Date()
     }
+
+    setSymptoms([...symptoms, newSymptom])
+    setSymptomName('')
+    setSymptomDescription('')
+    setSelectedCategory('')
+    setSeverity('moderate')
+    setDuration('')
   }
 
   const removeSymptom = (id: string) => {
-    setSelectedSymptoms(selectedSymptoms.filter(s => s.id !== id))
+    setSymptoms(symptoms.filter(s => s.id !== id))
   }
 
-  const generateAssessment = () => {
-    setShowAssessment(true)
+  const quickAddSymptom = (symptom: typeof commonSymptoms[0]) => {
+    const newSymptom: Symptom = {
+      id: Date.now().toString(),
+      name: symptom.name,
+      category: symptom.category,
+      description: `Experiencing ${symptom.name.toLowerCase()}`,
+      severity: symptom.severity,
+      duration: '1 day',
+      frequency: 'constant',
+      urgencyLevel: symptom.severity === 'critical' ? 5 : symptom.severity === 'severe' ? 4 : symptom.severity === 'moderate' ? 3 : 2,
+      onsetDate: new Date()
+    }
+
+    setSymptoms([...symptoms, newSymptom])
   }
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "mild": return "bg-green-100 text-green-800"
-      case "moderate": return "bg-yellow-100 text-yellow-800"
-      case "severe": return "bg-red-100 text-red-800"
-      default: return "bg-gray-100 text-gray-800"
+  const assessSymptoms = async () => {
+    if (symptoms.length === 0) return
+
+    setIsAssessing(true)
+    setCurrentStep('assessment')
+
+    // Simulate AI assessment
+    await new Promise(resolve => setTimeout(resolve, 3000))
+
+    // Determine risk level based on symptoms
+    const maxUrgency = Math.max(...symptoms.map(s => s.urgencyLevel))
+    const hasCriticalSymptoms = symptoms.some(s => s.severity === 'critical')
+    const hasSevereSymptoms = symptoms.some(s => s.severity === 'severe')
+
+    let riskLevel: AssessmentResult['riskLevel'] = 'low'
+    let urgency: AssessmentResult['urgency'] = 'routine'
+    let shouldSeekCare = false
+
+    if (hasCriticalSymptoms || maxUrgency >= 5) {
+      riskLevel = 'critical'
+      urgency = 'immediate'
+      shouldSeekCare = true
+    } else if (hasSevereSymptoms || maxUrgency >= 4) {
+      riskLevel = 'high'
+      urgency = 'within_24h'
+      shouldSeekCare = true
+    } else if (maxUrgency >= 3) {
+      riskLevel = 'medium'
+      urgency = 'within_week'
+      shouldSeekCare = true
+    } else {
+      riskLevel = 'low'
+      urgency = 'routine'
+      shouldSeekCare = false
+    }
+
+    // Generate recommendations based on symptoms
+    const recommendations: string[] = []
+    const possibleConditions: string[] = []
+
+    symptoms.forEach(symptom => {
+      switch (symptom.category) {
+        case 'cardiovascular':
+          if (symptom.name.toLowerCase().includes('chest')) {
+            recommendations.push('Seek immediate medical attention for chest pain')
+            possibleConditions.push('Angina', 'Heart attack', 'Costochondritis')
+          }
+          break
+        case 'respiratory':
+          if (symptom.name.toLowerCase().includes('breath')) {
+            recommendations.push('Monitor breathing and seek care if symptoms worsen')
+            possibleConditions.push('Asthma', 'COPD', 'Pneumonia')
+          }
+          break
+        case 'neurological':
+          if (symptom.name.toLowerCase().includes('headache')) {
+            recommendations.push('Rest in a quiet, dark room and stay hydrated')
+            possibleConditions.push('Migraine', 'Tension headache', 'Sinus headache')
+          }
+          break
+        default:
+          recommendations.push(`Monitor ${symptom.name.toLowerCase()} symptoms`)
+      }
+    })
+
+    if (recommendations.length === 0) {
+      recommendations.push('Monitor symptoms and seek care if they persist or worsen')
+    }
+
+    const result: AssessmentResult = {
+      riskLevel,
+      recommendations,
+      shouldSeekCare,
+      urgency,
+      possibleConditions
+    }
+
+    setAssessmentResult(result)
+    setCurrentStep('result')
+    setIsAssessing(false)
+  }
+
+  const getRiskLevelColor = (level: string) => {
+    switch (level) {
+      case 'critical': return 'bg-red-500'
+      case 'high': return 'bg-orange-500'
+      case 'medium': return 'bg-yellow-500'
+      case 'low': return 'bg-green-500'
+      default: return 'bg-gray-500'
     }
   }
 
-  const getRecommendedSpecialist = (symptoms: Symptom[]) => {
-    const categories = symptoms.map(s => s.category)
-    if (categories.includes("cardiovascular")) return "Cardiologist"
-    if (categories.includes("neurological")) return "Neurologist"
-    if (categories.includes("respiratory")) return "Pulmonologist"
-    if (categories.includes("gastrointestinal")) return "Gastroenterologist"
-    return "General Practitioner"
-  }
-
-  const getUrgencyLevel = (symptoms: Symptom[]) => {
-    const hasSevere = symptoms.some(s => s.severity === "severe")
-    const hasMultipleModerate = symptoms.filter(s => s.severity === "moderate").length >= 2
-    
-    if (hasSevere) return { level: "High", color: "text-red-600", message: "Consider seeking immediate medical attention" }
-    if (hasMultipleModerate) return { level: "Medium", color: "text-yellow-600", message: "Schedule an appointment within 24-48 hours" }
-    return { level: "Low", color: "text-green-600", message: "Monitor symptoms and consult if they persist" }
-  }
-
-  if (showAssessment) {
-    const urgency = getUrgencyLevel(selectedSymptoms)
-    const specialist = getRecommendedSpecialist(selectedSymptoms)
-
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            onClick={() => setShowAssessment(false)}
-            className="p-0"
-          >
-            ← Back to Symptom Checker
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              Symptom Assessment
-            </CardTitle>
-            <CardDescription>
-              Based on your reported symptoms, here's our assessment and recommendations
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            
-            {/* Urgency Level */}
-            <div className={`p-4 rounded-lg border-l-4 ${urgency.level === 'High' ? 'border-red-500 bg-red-50' : urgency.level === 'Medium' ? 'border-yellow-500 bg-yellow-50' : 'border-green-500 bg-green-50'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="font-semibold">Urgency Level:</span>
-                <Badge className={`${urgency.color} bg-transparent`}>{urgency.level}</Badge>
-              </div>
-              <p className={urgency.color}>{urgency.message}</p>
-            </div>
-
-            {/* Symptoms Summary */}
-            <div>
-              <h3 className="font-semibold mb-3">Your Reported Symptoms:</h3>
-              <div className="space-y-2">
-                {selectedSymptoms.map((symptom) => (
-                  <div key={symptom.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <span className="font-medium">{symptom.name}</span>
-                      <span className="text-muted-foreground ml-2">• {symptom.duration}</span>
-                    </div>
-                    <Badge className={getSeverityColor(symptom.severity)}>
-                      {symptom.severity}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recommendations */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Recommended Specialist</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-3">
-                    <Stethoscope className="h-8 w-8 text-blue-500" />
-                    <div>
-                      <p className="font-semibold">{specialist}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Best suited for your symptoms
-                      </p>
-                    </div>
-                  </div>
-                  <Button className="w-full mt-4" asChild>
-                    <a href="/dashboard/find-doctors">
-                      Find {specialist}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Next Steps</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm">Book a consultation</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm">Monitor symptoms</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm">Keep a symptom diary</span>
-                  </div>
-                  <Button variant="outline" className="w-full mt-4">
-                    Schedule Consultation
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Disclaimer */}
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800">
-                <strong>Important:</strong> This assessment is for informational purposes only and should not replace professional medical advice. 
-                Always consult with a healthcare provider for proper diagnosis and treatment.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  const getUrgencyText = (urgency: string) => {
+    switch (urgency) {
+      case 'immediate': return 'Seek immediate medical care'
+      case 'within_24h': return 'Seek care within 24 hours'
+      case 'within_week': return 'Schedule appointment within a week'
+      case 'routine': return 'Monitor symptoms'
+      default: return 'Monitor symptoms'
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Symptom Checker</h1>
-        <p className="text-muted-foreground mt-2">
-          Tell us about your symptoms to get personalized recommendations and find the right specialist.
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Symptom Checker</h1>
+        <p className="text-muted-foreground">
+          Describe your symptoms and get AI-powered health recommendations
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main Form */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Quick Symptom Categories */}
-          <Card>
+      {currentStep === 'input' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Quick Add Common Symptoms */}
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Select by Category</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                Quick Add Common Symptoms
+              </CardTitle>
               <CardDescription>
-                Choose the category that best describes your symptoms
+                Click on common symptoms to add them quickly
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-3 md:grid-cols-2">
-                {symptomCategories.map((category) => (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {commonSymptoms.map((symptom) => (
                   <Button
-                    key={category.id}
+                    key={symptom.name}
                     variant="outline"
-                    className="h-auto p-4 justify-start"
-                    onClick={() => setCurrentSymptom({...currentSymptom, category: category.id})}
+                    size="sm"
+                    onClick={() => quickAddSymptom(symptom)}
+                    className="text-xs"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${category.color}`}>
-                        <category.icon className="h-4 w-4" />
-                      </div>
-                      <div className="text-left">
-                        <p className="font-medium">{category.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {category.symptoms.slice(0, 2).join(", ")}...
-                        </p>
-                      </div>
-                    </div>
+                    {symptom.name}
                   </Button>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Add Symptom Form */}
-          <Card>
+          {/* Add Custom Symptom */}
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Describe Your Symptom</CardTitle>
+              <CardTitle>Add Custom Symptom</CardTitle>
               <CardDescription>
-                Provide details about what you're experiencing
+                Describe your symptoms in detail for better assessment
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="symptom-name">Symptom Name</Label>
-                  <Input
-                    id="symptom-name"
-                    placeholder="e.g., Headache, Cough, Fever"
-                    value={currentSymptom.name}
-                    onChange={(e) => setCurrentSymptom({...currentSymptom, name: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="body-part">Body Part (Optional)</Label>
-                  <Input
-                    id="body-part"
-                    placeholder="e.g., Head, Chest, Abdomen"
-                    value={selectedBodyPart}
-                    onChange={(e) => setSelectedBodyPart(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="severity">Severity</Label>
-                  <Select value={currentSymptom.severity} onValueChange={(value: "mild" | "moderate" | "severe") => setCurrentSymptom({...currentSymptom, severity: value})}>
+                  <Label htmlFor="category">Symptom Category</Label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                     <SelectTrigger>
-                      <SelectValue placeholder="How severe is it?" />
+                      <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="mild">Mild - Barely noticeable</SelectItem>
-                      <SelectItem value="moderate">Moderate - Noticeable discomfort</SelectItem>
-                      <SelectItem value="severe">Severe - Significant discomfort</SelectItem>
+                      {symptomCategories.map((category) => (
+                        <SelectItem key={category.value} value={category.value}>
+                          <div className="flex items-center gap-2">
+                            <category.icon className="h-4 w-4" />
+                            {category.label}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
-                  <Label htmlFor="duration">Duration</Label>
-                  <Select value={currentSymptom.duration} onValueChange={(value) => setCurrentSymptom({...currentSymptom, duration: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="How long?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Less than 1 hour">Less than 1 hour</SelectItem>
-                      <SelectItem value="1-6 hours">1-6 hours</SelectItem>
-                      <SelectItem value="6-24 hours">6-24 hours</SelectItem>
-                      <SelectItem value="1-3 days">1-3 days</SelectItem>
-                      <SelectItem value="3-7 days">3-7 days</SelectItem>
-                      <SelectItem value="More than 1 week">More than 1 week</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="symptom">Symptom Name</Label>
+                  <Input
+                    id="symptom"
+                    value={symptomName}
+                    onChange={(e) => setSymptomName(e.target.value)}
+                    placeholder="e.g., Headache, Fever, Chest Pain"
+                  />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="description">Additional Details (Optional)</Label>
+                <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe triggers, what makes it better/worse, any associated symptoms..."
-                  value={currentSymptom.description}
-                  onChange={(e) => setCurrentSymptom({...currentSymptom, description: e.target.value})}
+                  value={symptomDescription}
+                  onChange={(e) => setSymptomDescription(e.target.value)}
+                  placeholder="Describe your symptoms in detail..."
+                  rows={3}
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="severity">Severity</Label>
+                  <Select value={severity} onValueChange={(value: any) => setSeverity(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mild">Mild</SelectItem>
+                      <SelectItem value="moderate">Moderate</SelectItem>
+                      <SelectItem value="severe">Severe</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="duration">Duration</Label>
+                  <Input
+                    id="duration"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder="e.g., 2 days, 1 week"
+                />
+              </div>
+                <div className="flex items-end">
               <Button onClick={addSymptom} className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
                 Add Symptom
               </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Sidebar - Selected Symptoms */}
-        <div>
-          <Card>
+          {/* Current Symptoms */}
+          {symptoms.length > 0 && (
+            <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Your Symptoms
-                <Badge variant="secondary">{selectedSymptoms.length}</Badge>
-              </CardTitle>
-              <CardDescription>
-                {selectedSymptoms.length === 0 
-                  ? "Add symptoms to get started" 
-                  : "Review your symptoms before assessment"}
-              </CardDescription>
+                <CardTitle>Current Symptoms ({symptoms.length})</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {selectedSymptoms.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No symptoms added yet</p>
-                </div>
-              ) : (
-                <>
-                  {selectedSymptoms.map((symptom) => (
-                    <div key={symptom.id} className="flex items-start justify-between p-3 border rounded-lg">
+              <CardContent>
+                <div className="space-y-3">
+                  {symptoms.map((symptom) => (
+                    <div key={symptom.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{symptom.name}</span>
-                          <Badge className={getSeverityColor(symptom.severity)}>
+                          <Badge variant={symptom.severity === 'critical' ? 'destructive' : 'secondary'}>
                             {symptom.severity}
                           </Badge>
+                          <span className="font-medium">{symptom.name}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">{symptom.description}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {symptom.duration}
+                          </span>
+                          <span className="capitalize">{symptom.category}</span>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => removeSymptom(symptom.id)}
-                        className="p-1 h-auto"
+                        className="text-red-500 hover:text-red-700"
                       >
-                        <X className="h-3 w-3" />
+                        Remove
                       </Button>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
                   
+          {/* Assessment Button */}
+          <div className="text-center">
                   <Button 
-                    onClick={generateAssessment}
-                    className="w-full mt-4"
-                    disabled={selectedSymptoms.length === 0}
-                  >
-                    Get Assessment
+              onClick={assessSymptoms}
+              disabled={symptoms.length === 0}
+              size="lg"
+              className="px-8"
+            >
+              Assess Symptoms
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                </>
-              )}
+          </div>
+        </motion.div>
+      )}
+
+      {currentStep === 'assessment' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center py-12"
+        >
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-2xl font-bold mb-2">Analyzing Your Symptoms</h2>
+          <p className="text-muted-foreground">
+            Our AI is assessing your symptoms and generating personalized recommendations...
+          </p>
+        </motion.div>
+      )}
+
+      {currentStep === 'result' && assessmentResult && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Risk Assessment */}
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className={`w-4 h-4 rounded-full ${getRiskLevelColor(assessmentResult.riskLevel)}`}></div>
+                <CardTitle>Risk Assessment</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold mb-2">Risk Level</h3>
+                  <Badge 
+                    variant={assessmentResult.riskLevel === 'critical' ? 'destructive' : 'secondary'}
+                    className="text-lg px-4 py-2"
+                  >
+                    {assessmentResult.riskLevel.toUpperCase()}
+                  </Badge>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">Recommended Action</h3>
+                  <p className="text-lg font-medium">
+                    {getUrgencyText(assessmentResult.urgency)}
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          {/* Recommendations */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Recommendations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {assessmentResult.recommendations.map((recommendation, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p>{recommendation}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Possible Conditions */}
+          {assessmentResult.possibleConditions.length > 0 && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  Possible Conditions
+                </CardTitle>
+                <CardDescription>
+                  These are potential conditions based on your symptoms. Only a healthcare provider can provide a proper diagnosis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {assessmentResult.possibleConditions.map((condition, index) => (
+                    <Badge key={index} variant="outline">
+                      {condition}
+                    </Badge>
+                  ))}
+                </div>
+            </CardContent>
+          </Card>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              onClick={() => setCurrentStep('input')}
+              variant="outline"
+              size="lg"
+            >
+              Add More Symptoms
+            </Button>
+            {assessmentResult.shouldSeekCare && (
+              <Button size="lg" className="bg-red-600 hover:bg-red-700">
+                Book Consultation
+              </Button>
+            )}
+          </div>
+
+          {/* Disclaimer */}
+          <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-semibold text-yellow-800">Important Disclaimer</h4>
+                <p className="text-sm text-yellow-700 mt-1">
+                  This symptom checker is for informational purposes only and should not replace professional medical advice. 
+                  If you're experiencing severe symptoms, please seek immediate medical attention.
+                </p>
         </div>
       </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   )
 } 

@@ -30,7 +30,7 @@ import {
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-type BookingStep = "details" | "scheduling" | "payment" | "confirmation"
+type BookingStep = "doctor-selection" | "details" | "scheduling" | "payment" | "confirmation"
 
 type ConsultationType = "chat" | "video" | "appointment"
 
@@ -41,6 +41,9 @@ type Doctor = {
   rating: number
   consultationFee: number
   avatar?: string
+  bio?: string
+  yearsOfExperience?: number
+  isAvailable: boolean
 }
 
 // Available time slots (mock data)
@@ -54,9 +57,12 @@ function ConsultationBookingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  const [currentStep, setCurrentStep] = useState<BookingStep>("details")
+  const [currentStep, setCurrentStep] = useState<BookingStep>("doctor-selection" as BookingStep)
   const [consultationType, setConsultationType] = useState<ConsultationType>("chat")
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null)
+  const [availableDoctors, setAvailableDoctors] = useState<Doctor[]>([])
+  const [loadingDoctors, setLoadingDoctors] = useState(true)
+  const [isBooking, setIsBooking] = useState(false)
   const [bookingData, setBookingData] = useState({
     symptoms: "",
     urgency: "medium",
@@ -67,29 +73,50 @@ function ConsultationBookingPageContent() {
   })
 
   useEffect(() => {
-    // Get doctor ID and consultation type from URL params
-    const doctorId = searchParams.get("doctor")
-    const type = searchParams.get("type") as ConsultationType
-    
-    if (type) {
-      setConsultationType(type)
+    const fetchDoctors = async () => {
+      setLoadingDoctors(true)
+      try {
+        const { getAvailableDoctors, getDoctorById } = await import("@/actions/doctors")
+        
+        // Get doctor ID and consultation type from URL params
+        const doctorId = searchParams.get("doctor")
+        const type = searchParams.get("type") as ConsultationType
+        
+        if (type) {
+          setConsultationType(type)
+        }
+
+        if (doctorId) {
+          // If doctor ID is provided, fetch that specific doctor and skip to details
+          const doctor = await getDoctorById(doctorId)
+          if (doctor) {
+            setSelectedDoctor(doctor)
+            setCurrentStep("details")
+          } else {
+            // Doctor not found, load all doctors for selection
+            const doctors = await getAvailableDoctors()
+            setAvailableDoctors(doctors)
+            setCurrentStep("doctor-selection")
+          }
+        } else {
+          // No doctor provided, load all doctors for selection
+          const doctors = await getAvailableDoctors()
+          setAvailableDoctors(doctors)
+          setCurrentStep("doctor-selection")
+        }
+      } catch (error) {
+        console.error("Error fetching doctors:", error)
+        setAvailableDoctors([])
+      } finally {
+        setLoadingDoctors(false)
+      }
     }
 
-    // Mock doctor data (in real app, fetch from API)
-    if (doctorId) {
-      setSelectedDoctor({
-        id: doctorId,
-        name: "Dr. Sarah Johnson",
-        specialty: "Cardiology",
-        rating: 4.9,
-        consultationFee: 75,
-        avatar: undefined
-      })
-    }
+    fetchDoctors()
   }, [searchParams])
 
   const handleNext = () => {
-    const steps: BookingStep[] = ["details", "scheduling", "payment", "confirmation"]
+    const steps: BookingStep[] = ["doctor-selection", "details", "scheduling", "payment", "confirmation"]
     const currentIndex = steps.indexOf(currentStep)
     if (currentIndex < steps.length - 1) {
       setCurrentStep(steps[currentIndex + 1])
@@ -97,31 +124,81 @@ function ConsultationBookingPageContent() {
   }
 
   const handleBack = () => {
-    if (currentStep === "details") {
+    if (currentStep === "doctor-selection") {
       router.back()
       return
     }
     
-    const steps: BookingStep[] = ["details", "scheduling", "payment", "confirmation"]
+    const steps: BookingStep[] = ["doctor-selection", "details", "scheduling", "payment", "confirmation"]
     const currentIndex = steps.indexOf(currentStep)
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1])
     }
   }
 
+  const handleDoctorSelect = (doctor: Doctor) => {
+    setSelectedDoctor(doctor)
+    setCurrentStep("details")
+  }
+
   const handleBooking = async () => {
+    if (isBooking) return // Prevent double-clicks
+    
+    setIsBooking(true)
     try {
-      // Start consultation immediately for chat/video
-      if (consultationType === "chat") {
-        router.push(`/consultation/chat?doctor=${selectedDoctor?.id}`)
-      } else if (consultationType === "video") {
-        router.push(`/consultation/video?doctor=${selectedDoctor?.id}`)
+      if (!selectedDoctor) {
+        throw new Error("No doctor selected")
+      }
+
+      // Create consultation record for chat/video
+      if (consultationType === "chat" || consultationType === "video") {
+        const response = await fetch('/api/consultations/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            doctorId: selectedDoctor.id,
+            consultationType: consultationType === "video" ? "video_call" : "chat_only",
+            symptoms: bookingData.symptoms ? [bookingData.symptoms] : undefined,
+            scheduledAt: new Date().toISOString(),
+            duration: "30"
+          })
+        })
+
+        const result = await response.json()
+
+        if (response.ok && result.success) {
+          // Redirect to the consultation with the proper ID
+          if (consultationType === "chat") {
+            router.push(`/consultation/chat?id=${result.consultation.id}`)
+          } else if (consultationType === "video") {
+            router.push(`/consultation/video?id=${result.consultation.id}`)
+          }
+        } else {
+          throw new Error(result.error || "Failed to create consultation")
+        }
       } else {
         // For appointments, just show confirmation and redirect to dashboard
         setCurrentStep("confirmation")
       }
     } catch (error) {
       console.error("Error booking consultation:", error)
+      
+      // Show more specific error messages
+      const errorMessage = error instanceof Error ? error.message : "Failed to book consultation"
+      
+      if (errorMessage.includes("Not authenticated")) {
+        alert("Please log in to book a consultation.")
+        window.location.href = "/login"
+      } else if (errorMessage.includes("Patient profile not found")) {
+        alert("Please complete your patient profile first.")
+        window.location.href = "/onboarding"
+      } else {
+        alert(`Booking failed: ${errorMessage}. Please try again.`)
+      }
+    } finally {
+      setIsBooking(false)
     }
   }
 
@@ -165,14 +242,14 @@ function ConsultationBookingPageContent() {
   const consultationInfo = getConsultationTypeInfo()
   const ConsultationIcon = consultationInfo.icon
 
-  if (!selectedDoctor) {
+  // Loading state
+  if (loadingDoctors) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Doctor not found</h2>
-          <Button onClick={() => router.push("/dashboard/find-doctors")}>
-            Find Doctors
-          </Button>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-2xl font-bold mb-4">Loading...</h2>
+          <p className="text-gray-600">Finding available doctors...</p>
         </div>
       </div>
     )
@@ -189,7 +266,7 @@ function ConsultationBookingPageContent() {
                 Consultation Booked Successfully!
               </h1>
               <p className="text-muted-foreground">
-                Your consultation with {selectedDoctor.name} has been confirmed.
+                Your consultation with {selectedDoctor?.name} has been confirmed.
               </p>
             </div>
 
@@ -198,7 +275,7 @@ function ConsultationBookingPageContent() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span>Doctor:</span>
-                    <span className="font-medium">{selectedDoctor.name}</span>
+                    <span className="font-medium">{selectedDoctor?.name}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Type:</span>
@@ -218,7 +295,7 @@ function ConsultationBookingPageContent() {
                   )}
                   <div className="flex items-center justify-between pt-2 border-t">
                     <span>Fee:</span>
-                    <span className="font-bold text-green-600">${selectedDoctor.consultationFee}</span>
+                    <span className="font-bold text-green-600">${selectedDoctor?.consultationFee}</span>
                   </div>
                 </div>
               </CardContent>
@@ -236,7 +313,7 @@ function ConsultationBookingPageContent() {
                 <Button variant="outline" onClick={() => router.push("/dashboard")}>
                   Go to Dashboard
                 </Button>
-                {consultationType !== "appointment" && (
+                {consultationType !== "appointment" && selectedDoctor && (
                   <Button onClick={() => router.push(`/consultation/${consultationType}?doctor=${selectedDoctor.id}`)}>
                     Start Consultation Now
                   </Button>
@@ -247,6 +324,147 @@ function ConsultationBookingPageContent() {
         </div>
       </div>
     )
+  }
+
+  // Doctor selection step
+  if (currentStep === "doctor-selection") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+        <div className="container mx-auto px-4">
+          <div className="mx-auto max-w-6xl">
+            
+            {/* Header */}
+            <div className="mb-8">
+              <Button variant="ghost" onClick={handleBack} className="mb-4 gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              
+              <div className="text-center">
+                <Stethoscope className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                <h1 className="text-3xl font-bold mb-2">Choose Your Doctor</h1>
+                <p className="text-muted-foreground">Select a doctor for your {consultationType} consultation</p>
+              </div>
+            </div>
+
+            {/* Consultation Type Selector */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Consultation Type</CardTitle>
+                <CardDescription>Select how you'd like to consult</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div 
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      consultationType === "chat" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => setConsultationType("chat")}
+                  >
+                    <MessageCircle className="h-8 w-8 text-blue-600 mb-2" />
+                    <h3 className="font-semibold">Chat Consultation</h3>
+                    <p className="text-sm text-muted-foreground">Text-based consultation</p>
+                  </div>
+                  
+                  <div 
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      consultationType === "video" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => setConsultationType("video")}
+                  >
+                    <Video className="h-8 w-8 text-blue-600 mb-2" />
+                    <h3 className="font-semibold">Video Call</h3>
+                    <p className="text-sm text-muted-foreground">Face-to-face consultation</p>
+                  </div>
+                  
+                  <div 
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      consultationType === "appointment" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => setConsultationType("appointment")}
+                  >
+                    <Calendar className="h-8 w-8 text-blue-600 mb-2" />
+                    <h3 className="font-semibold">Appointment</h3>
+                    <p className="text-sm text-muted-foreground">Schedule for later</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Available Doctors */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {availableDoctors.length === 0 ? (
+                <div className="col-span-full text-center py-12">
+                  <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">No doctors available</h3>
+                  <p className="text-muted-foreground mb-4">
+                    No doctors are currently available for consultation.
+                  </p>
+                  <Button onClick={() => router.push("/dashboard")}>
+                    Go to Dashboard
+                  </Button>
+                </div>
+              ) : (
+                availableDoctors.map((doctor) => (
+                  <Card key={doctor.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+                    <CardContent className="pt-6">
+                      <div className="text-center mb-4">
+                        <Avatar className="h-20 w-20 mx-auto mb-3">
+                          <AvatarImage src={doctor.avatar} />
+                          <AvatarFallback className="text-lg">
+                            {doctor.name.split(' ').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <h3 className="text-lg font-semibold">{doctor.name}</h3>
+                        <p className="text-muted-foreground">{doctor.specialty}</p>
+                      </div>
+                      
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="font-medium">{doctor.rating.toFixed(1)}</span>
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {doctor.yearsOfExperience}+ years exp.
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-bold text-green-600">
+                            ${doctor.consultationFee}
+                          </span>
+                          <Badge variant="secondary">Available</Badge>
+                        </div>
+                      </div>
+                      
+                      {doctor.bio && (
+                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                          {doctor.bio}
+                        </p>
+                      )}
+                      
+                      <Button 
+                        onClick={() => handleDoctorSelect(doctor)}
+                        className="w-full"
+                      >
+                        Select Doctor
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Safety check - if no doctor selected and not on doctor selection step, redirect
+  if (!selectedDoctor && (currentStep as string) !== "doctor-selection") {
+    setCurrentStep("doctor-selection" as BookingStep)
+    return null
   }
 
   return (
@@ -274,30 +492,32 @@ function ConsultationBookingPageContent() {
             <div className="lg:col-span-2">
               
               {/* Doctor Info */}
-              <Card className="mb-6">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={selectedDoctor.avatar} />
-                      <AvatarFallback className="text-lg">
-                        {selectedDoctor.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold">{selectedDoctor.name}</h3>
-                      <p className="text-muted-foreground">{selectedDoctor.specialty}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-medium">{selectedDoctor.rating}</span>
+              {selectedDoctor && (
+                <Card className="mb-6">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={selectedDoctor.avatar} />
+                        <AvatarFallback className="text-lg">
+                          {selectedDoctor.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold">{selectedDoctor.name}</h3>
+                        <p className="text-muted-foreground">{selectedDoctor.specialty}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <span className="font-medium">{selectedDoctor.rating}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold">${selectedDoctor.consultationFee}</div>
+                        <div className="text-sm text-muted-foreground">consultation fee</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold">${selectedDoctor.consultationFee}</div>
-                      <div className="text-sm text-muted-foreground">consultation fee</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Consultation Details */}
               {currentStep === "details" && (
@@ -420,7 +640,7 @@ function ConsultationBookingPageContent() {
                       <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
                           <span>Consultation Fee:</span>
-                          <span>${selectedDoctor.consultationFee}</span>
+                          <span>${selectedDoctor?.consultationFee || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Platform Fee:</span>
@@ -428,7 +648,7 @@ function ConsultationBookingPageContent() {
                         </div>
                         <div className="flex justify-between font-semibold border-t pt-1 mt-2">
                           <span>Total:</span>
-                          <span>${selectedDoctor.consultationFee + 5}</span>
+                          <span>${(selectedDoctor?.consultationFee || 0) + 5}</span>
                         </div>
                       </div>
                     </div>
@@ -500,28 +720,38 @@ function ConsultationBookingPageContent() {
                     )}
                   </div>
                   
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between font-semibold">
-                      <span>Total Fee:</span>
-                      <span>${selectedDoctor.consultationFee}</span>
+                  {selectedDoctor && (
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between font-semibold">
+                        <span>Total Fee:</span>
+                        <span>${selectedDoctor.consultationFee}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <Button 
-                    className="w-full"
-                    onClick={currentStep === "payment" ? handleBooking : handleNext}
-                    disabled={
-                      (currentStep === "details" && !bookingData.symptoms) ||
-                      (currentStep === "scheduling" && consultationType === "appointment" && (!bookingData.selectedDate || !bookingData.selectedTime))
-                    }
-                  >
-                    {currentStep === "payment" 
-                      ? `Pay $${selectedDoctor.consultationFee + 5} & Book`
-                      : consultationInfo.immediate && currentStep === "details"
-                      ? `Book & Start ${consultationType === "chat" ? "Chat" : "Video Call"}`
-                      : "Continue"
-                    }
-                  </Button>
+                  {(currentStep as string) !== "doctor-selection" && selectedDoctor && (
+                    <Button 
+                      className="w-full"
+                      onClick={currentStep === "payment" ? handleBooking : handleNext}
+                      disabled={
+                        isBooking ||
+                        (currentStep === "details" && !bookingData.symptoms) ||
+                        (currentStep === "scheduling" && consultationType === "appointment" && (!bookingData.selectedDate || !bookingData.selectedTime))
+                      }
+                    >
+                      {isBooking ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Booking...
+                        </>
+                      ) : currentStep === "payment" 
+                        ? `Pay $${selectedDoctor.consultationFee + 5} & Book`
+                        : consultationInfo.immediate && currentStep === "details"
+                        ? `Book & Start ${consultationType === "chat" ? "Chat" : "Video Call"}`
+                        : "Continue"
+                      }
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>
