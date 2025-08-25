@@ -63,7 +63,7 @@ export default function ConsultationNotesPage() {
 
   useEffect(() => {
     filterNotes()
-  }, [notes, searchTerm, activeTab])
+  }, [notes, searchTerm, activeTab, filterNotes])
 
   const loadConsultationNotes = async () => {
     try {

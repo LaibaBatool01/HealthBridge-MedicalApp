@@ -95,7 +95,7 @@ export default function AdminSupportPage() {
       }
     }
     loadSupport()
-  }, [])
+  }, [mockTickets])
 
   const handleReply = async () => {
     if (!selectedTicket || !reply.trim()) return

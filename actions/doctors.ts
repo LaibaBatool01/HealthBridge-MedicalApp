@@ -281,3 +281,160 @@ export async function searchDoctors(query: string): Promise<DoctorWithUser[]> {
     return []
   }
 }
+
+export async function getPendingDoctors() {
+  try {
+    const pendingDoctors = await db
+      .select({
+        id: doctors.id,
+        userId: doctors.userId,
+        licenseNumber: doctors.licenseNumber,
+        specialty: doctors.specialty,
+        subSpecialty: doctors.subSpecialty,
+        yearsOfExperience: doctors.yearsOfExperience,
+        education: doctors.education,
+        certifications: doctors.certifications,
+        languagesSpoken: doctors.languagesSpoken,
+        consultationFee: doctors.consultationFee,
+        bio: doctors.bio,
+        isAvailable: doctors.isAvailable,
+        verificationStatus: doctors.verificationStatus,
+        verificationDate: doctors.verificationDate,
+        verificationNotes: doctors.verificationNotes,
+        rating: doctors.rating,
+        totalRatings: doctors.totalRatings,
+        createdAt: doctors.createdAt,
+        updatedAt: doctors.updatedAt,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          phone: users.phone,
+          profileImage: users.profileImage,
+          createdAt: users.createdAt,
+        }
+      })
+      .from(doctors)
+      .leftJoin(users, eq(doctors.userId, users.id))
+      .where(eq(doctors.verificationStatus, "pending"))
+      .orderBy(desc(doctors.createdAt))
+
+    return pendingDoctors
+  } catch (error) {
+    console.error("Error fetching pending doctors:", error)
+    return []
+  }
+}
+
+export async function getAllDoctorsForAdmin() {
+  try {
+    const allDoctors = await db
+      .select({
+        id: doctors.id,
+        userId: doctors.userId,
+        licenseNumber: doctors.licenseNumber,
+        specialty: doctors.specialty,
+        subSpecialty: doctors.subSpecialty,
+        yearsOfExperience: doctors.yearsOfExperience,
+        education: doctors.education,
+        certifications: doctors.certifications,
+        languagesSpoken: doctors.languagesSpoken,
+        consultationFee: doctors.consultationFee,
+        bio: doctors.bio,
+        isAvailable: doctors.isAvailable,
+        verificationStatus: doctors.verificationStatus,
+        verificationDate: doctors.verificationDate,
+        verificationNotes: doctors.verificationNotes,
+        rating: doctors.rating,
+        totalRatings: doctors.totalRatings,
+        createdAt: doctors.createdAt,
+        updatedAt: doctors.updatedAt,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          phone: users.phone,
+          profileImage: users.profileImage,
+          createdAt: users.createdAt,
+        }
+      })
+      .from(doctors)
+      .leftJoin(users, eq(doctors.userId, users.id))
+      .orderBy(desc(doctors.createdAt))
+
+    return allDoctors
+  } catch (error) {
+    console.error("Error fetching all doctors for admin:", error)
+    return []
+  }
+}
+
+export async function getDoctorVerificationDetails(doctorId: string) {
+  try {
+    const doctor = await db
+      .select({
+        id: doctors.id,
+        userId: doctors.userId,
+        licenseNumber: doctors.licenseNumber,
+        specialty: doctors.specialty,
+        subSpecialty: doctors.subSpecialty,
+        yearsOfExperience: doctors.yearsOfExperience,
+        education: doctors.education,
+        certifications: doctors.certifications,
+        languagesSpoken: doctors.languagesSpoken,
+        consultationFee: doctors.consultationFee,
+        bio: doctors.bio,
+        isAvailable: doctors.isAvailable,
+        verificationStatus: doctors.verificationStatus,
+        verificationDate: doctors.verificationDate,
+        verificationNotes: doctors.verificationNotes,
+        verifiedBy: doctors.verifiedBy,
+        rating: doctors.rating,
+        totalRatings: doctors.totalRatings,
+        createdAt: doctors.createdAt,
+        updatedAt: doctors.updatedAt,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          phone: users.phone,
+          profileImage: users.profileImage,
+          createdAt: users.createdAt,
+        }
+      })
+      .from(doctors)
+      .leftJoin(users, eq(doctors.userId, users.id))
+      .where(eq(doctors.id, doctorId))
+      .limit(1)
+
+    return doctor[0] || null
+  } catch (error) {
+    console.error("Error fetching doctor verification details:", error)
+    return null
+  }
+}
+
+export async function verifyDoctor(doctorId: string, adminId: string, status: "approved" | "rejected", notes?: string) {
+  try {
+    const [updatedDoctor] = await db
+      .update(doctors)
+      .set({
+        verificationStatus: status,
+        verificationDate: new Date(),
+        verificationNotes: notes,
+        verifiedBy: adminId,
+        isAvailable: status === "approved" ? true : false,
+        updatedAt: new Date()
+      })
+      .where(eq(doctors.id, doctorId))
+      .returning()
+
+    return updatedDoctor
+  } catch (error) {
+    console.error("Error verifying doctor:", error)
+    throw error
+  }
+}
