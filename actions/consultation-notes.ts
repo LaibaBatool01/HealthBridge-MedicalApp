@@ -243,7 +243,7 @@ export async function updateConsultationNotes(consultationId: string, notes: str
     await db
       .update(consultations)
       .set({
-        notes: notes,
+        doctorNotes: notes,
         diagnosis: diagnosis || null,
         updatedAt: new Date()
       })
